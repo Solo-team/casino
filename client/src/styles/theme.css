@@ -1,0 +1,57 @@
+:root {
+  font-family: "Space Grotesk", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #f5f7ff;
+  background-color: #05060d;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+
+  --bg: #05060d;
+  --surface: rgba(10, 12, 28, 0.92);
+  --surface-alt: rgba(18, 21, 45, 0.9);
+  --card: rgba(22, 24, 52, 0.92);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --accent: #ffb703;
+  --accent-strong: #ff6f61;
+  --muted: #bbc4ff;
+  --text: #f5f7ff;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #eab308;
+
+  --shadow-xl: 0 25px 65px rgba(5, 6, 13, 0.65);
+  --shadow-card: 0 15px 40px rgba(3, 4, 12, 0.55);
+  --radius-xl: 32px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.25), transparent 55%),
+    radial-gradient(circle at 80% 0%, rgba(253, 186, 116, 0.3), transparent 45%),
+    var(--bg);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.muted {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.95rem;
+}
+
+.hidden {
+  display: none !important;
+}

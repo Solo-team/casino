@@ -1,0 +1,57 @@
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.timeline-item {
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border-left: 4px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.timeline-item.win {
+  border-left-color: var(--success);
+}
+
+.timeline-item.loss {
+  border-left-color: var(--danger);
+}
+
+.timeline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast {
+  position: fixed;
+  bottom: 28px;
+  right: 24px;
+  padding: 14px 22px;
+  border-radius: 18px;
+  background: rgba(8, 9, 25, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 40;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast[data-type="success"] {
+  border-color: rgba(34, 197, 94, 0.6);
+  color: #bbf7d0;
+}
+
+.toast[data-type="error"] {
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fecaca;
+}
