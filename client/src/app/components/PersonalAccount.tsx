@@ -8,7 +8,7 @@ interface Props {
   history: ApiGameResult[];
   onLogin: (name: string, password: string) => Promise<void>;
   onRegister: (name: string, password: string, balance: number) => Promise<void>;
-  onDeposit: (amount: number) => Promise<void>;
+  onOpenDeposit: () => void;
   onRefreshHistory: () => Promise<void>;
   isBusy: boolean;
   isHistoryRefreshing: boolean;
@@ -19,7 +19,7 @@ const PersonalAccount: React.FC<Props> = ({
   history,
   onLogin,
   onRegister,
-  onDeposit,
+  onOpenDeposit,
   onRefreshHistory,
   isBusy,
   isHistoryRefreshing
@@ -27,14 +27,6 @@ const PersonalAccount: React.FC<Props> = ({
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const lastResult = history.length ? history[history.length - 1] : null;
-
-  const handleQuickDeposit = async () => {
-    try {
-      await onDeposit(1000);
-    } catch (error) {
-      console.error("Deposit failed:", error);
-    }
-  };
 
   if (!user) {
     return (
@@ -124,7 +116,7 @@ const PersonalAccount: React.FC<Props> = ({
             <button
               className="button button-primary account-cta"
               type="button"
-              onClick={handleQuickDeposit}
+              onClick={onOpenDeposit}
             >
               Add funds
             </button>

@@ -1,4 +1,12 @@
-import type { ApiGame, ApiGameResult, ApiProvider, ApiSlotGame, ApiUser } from "../../types/api";
+import type {
+  ApiGame,
+  ApiGameResult,
+  ApiPayment,
+  ApiProvider,
+  ApiSlotGame,
+  ApiUser,
+  CreateCryptoDepositResponse
+} from "../../types/api";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 const TOKEN_STORAGE_KEY = "casinoToken";
@@ -105,5 +113,12 @@ export const ApiService = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
-  getHistory: () => request<ApiGameResult[]>(`/users/history`)
+  getHistory: () => request<ApiGameResult[]>(`/users/history`),
+  createCryptoDeposit: (payload: { amount: number; currency?: string }) =>
+    request<CreateCryptoDepositResponse>(`/payments/crypto/deposits`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  getPayment: (paymentId: string) => request<ApiPayment>(`/payments/${paymentId}`),
+  getPayments: () => request<ApiPayment[]>(`/payments`)
 };

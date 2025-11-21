@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ApiGame, ApiGameResult, ApiProvider, ApiSlotGame, ApiUser } from "../../types/api";
+import type {
+  ApiGame,
+  ApiGameResult,
+  ApiPayment,
+  ApiProvider,
+  ApiSlotGame,
+  ApiUser,
+  CreateCryptoDepositResponse
+} from "../../types/api";
 import { ApiService, setToken, getToken } from "../services/api";
 import type { GameContext } from "../types";
 
@@ -24,6 +32,7 @@ export function useCasino() {
   const [history, setHistory] = useState<ApiGameResult[]>([]);
   const [currentGame, setCurrentGame] = useState<GameContext | null>(null);
   const [lastGameResult, setLastGameResult] = useState<ApiGameResult | null>(null);
+  const [lastPayment, setLastPayment] = useState<ApiPayment | null>(null);
 
   const [isAuthBusy, setAuthBusy] = useState(false);
   const [isDataLoading, setDataLoading] = useState(false);
@@ -78,15 +87,18 @@ export function useCasino() {
           ]);
           persistUser(userData);
           setHistory(historyList);
+          setLastPayment(null);
         } catch (error) {
           console.error("Failed to load user session, clearing token", error);
           setToken(null);
           persistToStorage(null);
           setHistory([]);
+          setLastPayment(null);
         }
       } else {
         persistUser(null);
         setHistory([]);
+        setLastPayment(null);
       }
     } finally {
       setDataLoading(false);
@@ -165,6 +177,36 @@ export function useCasino() {
     [persistUser, user]
   );
 
+  const refreshUser = useCallback(async () => {
+    if (!user) return null;
+    const updated = await ApiService.getCurrentUser();
+    persistUser(updated);
+    return updated;
+  }, [persistUser, user]);
+
+  const createCryptoDeposit = useCallback(
+    async (amount: number, currency?: string): Promise<CreateCryptoDepositResponse> => {
+      if (!user) {
+        throw new Error("Sign in to create a deposit");
+      }
+      const response = await ApiService.createCryptoDeposit({ amount, currency });
+      setLastPayment(response.payment);
+      return response;
+    },
+    [user]
+  );
+
+  const fetchPayment = useCallback(
+    async (paymentId: string): Promise<ApiPayment> => {
+      const payment = await ApiService.getPayment(paymentId);
+      if (payment.userId === user?.id) {
+        setLastPayment(payment);
+      }
+      return payment;
+    },
+    [user]
+  );
+
   const refreshHistory = useCallback(async () => {
     if (!user) return;
     setHistoryRefreshing(true);
@@ -228,6 +270,7 @@ export function useCasino() {
       history,
       currentGame,
       lastGameResult,
+      lastPayment,
       isAuthBusy,
       isDataLoading,
       isPlaying,
@@ -242,6 +285,7 @@ export function useCasino() {
       isHistoryRefreshing,
       isPlaying,
       lastGameResult,
+      lastPayment,
       providers,
       selectedProvider,
       slots,
@@ -254,11 +298,14 @@ export function useCasino() {
     login,
     register,
     deposit,
+    refreshUser,
     logout,
     selectProvider,
     openGame,
     closeGame,
     playGame,
-    refreshHistory
+    refreshHistory,
+    createCryptoDeposit,
+    fetchPayment
   };
 }

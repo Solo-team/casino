@@ -10,6 +10,7 @@ import Toast from "./app/components/Toast";
 import TopGamesSection from "./app/components/TopGamesSection";
 import AuthModal from "./app/components/AuthModal";
 import PersonalAccount from "./app/components/PersonalAccount";
+import DepositModal from "./app/components/DepositModal";
 import { useCasino } from "./app/hooks/useCasino";
 import { useToast } from "./app/hooks/useToast";
 
@@ -20,6 +21,7 @@ const App: React.FC = () => {
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showAccount, setShowAccount] = useState(false);
+  const [isDepositOpen, setDepositOpen] = useState(false);
 
   const handleAuthError = (error: unknown, fallback: string) => {
     showToast(error instanceof Error ? error.message : fallback, "error");
@@ -65,10 +67,7 @@ const App: React.FC = () => {
               onRegister={async (name, password, balance) => {
                 await casino.register(name, password, balance);
               }}
-              onDeposit={async (amount) => {
-                await casino.deposit(amount);
-                showToast("Balance updated", "success");
-              }}
+              onOpenDeposit={() => setDepositOpen(true)}
               onRefreshHistory={casino.refreshHistory}
               isBusy={casino.isAuthBusy}
               isHistoryRefreshing={casino.isHistoryRefreshing}
@@ -146,6 +145,32 @@ const App: React.FC = () => {
           }}
         />
       )}
+      <DepositModal
+        open={isDepositOpen}
+        onClose={() => setDepositOpen(false)}
+        onCreateDeposit={async (amount) => {
+          try {
+            const response = await casino.createCryptoDeposit(amount);
+            showToast("Deposit created. Follow the crypto instructions.", "success");
+            return response;
+          } catch (error) {
+            handleAuthError(error, "Unable to create deposit");
+            throw error;
+          }
+        }}
+        onRefreshPayment={async (paymentId) => {
+          try {
+            return await casino.fetchPayment(paymentId);
+          } catch (error) {
+            handleAuthError(error, "Unable to refresh payment");
+            throw error;
+          }
+        }}
+        onBalanceRefresh={async () => {
+          await casino.refreshUser();
+          await casino.refreshHistory();
+        }}
+      />
       <AuthModal
         open={isAuthModalOpen}
         initialMode={authMode}

@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { DataSource, DataSourceOptions } from "typeorm";
 import { UserOrmEntity } from "./entities/UserOrmEntity";
 import { GameResultOrmEntity } from "./entities/GameResultOrmEntity";
+import { PaymentTransactionOrmEntity } from "./entities/PaymentTransactionOrmEntity";
 
 dotenv.config();
 
@@ -26,7 +27,7 @@ const createDataSourceOptions = (): DataSourceOptions => {
     url: process.env.DATABASE_URL,
     synchronize,
     logging,
-    entities: [UserOrmEntity, GameResultOrmEntity],
+    entities: [UserOrmEntity, GameResultOrmEntity, PaymentTransactionOrmEntity],
     ssl: sslEnabled ? { rejectUnauthorized } : false
   };
 };

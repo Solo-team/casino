@@ -1188,3 +1188,139 @@
   color: var(--danger);
   font-size: 0.85rem;
 }
+
+.deposit-modal__content {
+  width: min(760px, 100%);
+}
+
+.deposit-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.status-chip .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-chip--neutral .dot {
+  background: #a1a1aa;
+}
+
+.status-chip--warning .dot {
+  background: #fbbf24;
+}
+
+.status-chip--positive .dot {
+  background: #34d399;
+}
+
+.status-chip--negative .dot {
+  background: #ef4444;
+}
+
+.deposit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-with-addon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-with-addon .input {
+  flex: 1;
+}
+
+.input-with-addon .addon {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+}
+
+.deposit-hint {
+  margin: 0;
+}
+
+.deposit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.deposit-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.instruction-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.instruction-card {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.instruction-card .mono {
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  word-break: break-all;
+}
+
+.deposit-status-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.status-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.success-banner {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.full-width {
+  width: 100%;
+  text-align: center;
+}
