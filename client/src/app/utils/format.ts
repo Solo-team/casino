@@ -1,10 +1,10 @@
-const currencyFormatter = new Intl.NumberFormat("ru-RU", {
+const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
-  currency: "RUB",
+  currency: "USD",
   maximumFractionDigits: 2
 });
 
-const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "short",
   timeStyle: "short"
 });

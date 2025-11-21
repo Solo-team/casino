@@ -19,7 +19,9 @@ declare global {
   }
 }
 
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID";
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
+let hasWarnedAboutGoogleClientId = false;
 
 const decodeCredential = (credential: string) => {
   const payload = credential.split(".")[1];
@@ -37,6 +39,14 @@ const decodeCredential = (credential: string) => {
 
 const GoogleAuthButton: React.FC<Props> = ({ onCredential, disabled }) => {
   useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) {
+      if (!hasWarnedAboutGoogleClientId) {
+        hasWarnedAboutGoogleClientId = true;
+        console.warn("Google Client ID is not configured. Google authentication will not work.");
+      }
+      return;
+    }
+
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client?hl=en";
     script.async = true;

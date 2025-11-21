@@ -83,7 +83,6 @@ export class ProviderA extends BaseSlotProvider {
       const symbolIndex = SYMBOLS_A.indexOf(symbol);
       
       if (gameId === "diamond-riches") {
-        // Выше выплаты для Diamond Riches
         if (symbol === "💎") {
           return betAmount * 100;
         }
@@ -92,7 +91,6 @@ export class ProviderA extends BaseSlotProvider {
         }
         return betAmount * (symbolIndex + 1) * 3;
       } else {
-        // Стандартные выплаты для Fruit Slots
         if (symbol === "💎") {
           return betAmount * 50;
         }

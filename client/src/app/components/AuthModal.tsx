@@ -1,5 +1,4 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import GoogleAuthButton from "./GoogleAuthButton";
 
 interface Props {
   open: boolean;
@@ -7,13 +6,12 @@ interface Props {
   onClose: () => void;
   onLogin: (payload: { name: string; password: string }) => Promise<void>;
   onRegister: (payload: { name: string; password: string; balance?: number }) => Promise<void>;
-  onGoogle: (payload: { email: string; name: string }) => Promise<void>;
   isBusy: boolean;
 }
 
 const perks = ["Daily cashback missions", "Priority withdrawals", "Live hosts 24/7"];
 
-const AuthModal: React.FC<Props> = ({ open, initialMode = "login", onClose, onLogin, onRegister, onGoogle, isBusy }) => {
+const AuthModal: React.FC<Props> = ({ open, initialMode = "login", onClose, onLogin, onRegister, isBusy }) => {
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -229,11 +227,6 @@ const AuthModal: React.FC<Props> = ({ open, initialMode = "login", onClose, onLo
                 {isBusy ? "Processing..." : isRegister ? "Create account" : "Sign in"}
               </button>
             </form>
-
-            <div className="divider" aria-hidden="true">
-              <span>or continue with</span>
-            </div>
-            <GoogleAuthButton disabled={isBusy} onCredential={payload => onGoogle(payload)} />
 
             <p className="auth-note">By continuing you accept the fair play policy and privacy terms.</p>
           </div>

@@ -12,6 +12,8 @@ interface Props {
   user: ApiUser | null;
   onSignInClick: () => void;
   onRegisterClick: () => void;
+  onAccountClick: () => void;
+  onLobbyClick?: () => void;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -40,10 +42,25 @@ const ACCOUNT_ITEMS = ["My bets", "Deposit", "Responsible play", "Support"];
 
 const MOBILE_TABS = ["Explore", "Account"] as const;
 
-const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick }) => {
+const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick, onAccountClick, onLobbyClick }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<(typeof MOBILE_TABS)[number]>("Explore");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  const handleNavClick = (item: NavItem) => {
+    if (item.children) {
+      setOpenDropdown(prev => (prev === item.label ? null : item.label));
+      return;
+    }
+    if (item.label === "Lobby" && onLobbyClick) {
+      onLobbyClick();
+      setMobileOpen(false);
+      return;
+    }
+    if (item.href) {
+      window.location.hash = item.href;
+    }
+  };
 
   return (
     <>
@@ -58,7 +75,7 @@ const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick }) => {
               onFocus={() => item.children && setOpenDropdown(item.label)}
               onMouseLeave={() => setOpenDropdown(null)}
             >
-              <button type="button" onClick={() => setOpenDropdown(prev => (prev === item.label ? null : item.label))}>
+              <button type="button" onClick={() => handleNavClick(item)}>
                 {item.label}
                 {item.tag && <span className="nav-tag">{item.tag}</span>}
                 {item.children && <span className="caret">⌄</span>}
@@ -81,17 +98,12 @@ const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick }) => {
             Menu
           </button>
           {!user ? (
-            <>
-              <button className="button button-secondary" type="button" onClick={onSignInClick}>
-                Sign in
-              </button>
-              <button className="button button-primary" type="button" onClick={onRegisterClick}>
-                Register
-              </button>
-            </>
+            <button className="button button-primary" type="button" onClick={onSignInClick}>
+              Sign in
+            </button>
           ) : (
-            <button className="button button-primary" type="button">
-              Play now
+            <button className="button button-primary" type="button" onClick={onAccountClick}>
+              My account
             </button>
           )}
         </div>

@@ -1,53 +1,77 @@
 import { Router, Request, Response } from "express";
 import { CasinoService } from "../../../application/services/CasinoService";
+import { generateToken } from "../utils/jwt";
+import { authMiddleware, AuthenticatedRequest } from "../middleware/auth";
 
 export function createApiRouter(casinoService: CasinoService): Router {
   const router = Router();
 
-  // Users
-  router.post("/users", async (req: Request, res: Response) => {
+  const registerHandler = async (req: Request, res: Response) => {
     try {
-      const { name, initialBalance } = req.body;
-      const user = await casinoService.createUser(name, initialBalance || 1000);
-      res.json(user);
+      const { name, password, initialBalance } = req.body;
+      const user = await casinoService.registerUser(name, password, initialBalance || 1000);
+      const token = generateToken({ userId: user.id, name: user.name });
+      res.json({ user: user.toJSON(), token });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error("Error in register:", error);
+      res.status(400).json({ error: error.message || "Registration failed" });
+    }
+  };
+
+  router.post("/users", registerHandler);
+  router.post("/auth/register", registerHandler);
+
+  router.post("/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { name, password } = req.body;
+      const user = await casinoService.authenticateUser(name, password);
+      const token = generateToken({ userId: user.id, name: user.name });
+      res.json({ user: user.toJSON(), token });
+    } catch (error: any) {
+      res.status(401).json({ error: error.message });
     }
   });
 
-  router.get("/users/:id", async (req: Request, res: Response) => {
+  router.get("/users/me", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const user = await casinoService.getUser(req.params.id);
-      res.json(user);
+      if (!req.userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const user = await casinoService.getUser(req.userId);
+      res.json(user.toJSON());
     } catch (error: any) {
       res.status(404).json({ error: error.message });
     }
   });
 
-  router.get("/users/name/:name", async (req: Request, res: Response) => {
+  router.post("/users/deposit", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const user = await casinoService.getUserByName(req.params.name);
-      if (!user) {
-        res.status(404).json({ error: "User not found" });
+      if (!req.userId) {
+        res.status(401).json({ error: "Unauthorized" });
         return;
       }
-      res.json(user);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  router.post("/users/:id/deposit", async (req: Request, res: Response) => {
-    try {
       const { amount } = req.body;
-      const user = await casinoService.deposit(req.params.id, amount);
-      res.json(user);
+      const user = await casinoService.deposit(req.userId, amount);
+      res.json(user.toJSON());
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
 
-  // Games
+  router.get("/users/history", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const history = await casinoService.getUserHistory(req.userId);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   router.get("/games", async (_req: Request, res: Response) => {
     try {
       const games = casinoService.getAvailableGames();
@@ -62,7 +86,6 @@ export function createApiRouter(casinoService: CasinoService): Router {
     }
   });
 
-  // Slot Providers
   router.get("/providers", async (_req: Request, res: Response) => {
     try {
       const providers = casinoService.getSlotProviders();
@@ -100,24 +123,17 @@ export function createApiRouter(casinoService: CasinoService): Router {
     }
   });
 
-  // Play Game
-  router.post("/play", async (req: Request, res: Response) => {
+  router.post("/play", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { userId, gameId, betAmount, gameData } = req.body;
-      const result = await casinoService.playGame(userId, gameId, betAmount, gameData);
+      if (!req.userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const { gameId, betAmount, gameData } = req.body;
+      const result = await casinoService.playGame(req.userId, gameId, betAmount, gameData);
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
-    }
-  });
-
-  // History
-  router.get("/users/:id/history", async (req: Request, res: Response) => {
-    try {
-      const history = await casinoService.getUserHistory(req.params.id);
-      res.json(history);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
     }
   });
 

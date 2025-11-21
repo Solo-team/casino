@@ -61,20 +61,16 @@ export class SlotMachineGame implements IGame {
   }
 
   private calculatePayout(betAmount: number, reels: string[]): number {
-    // Check for three of a kind
     if (reels[0] === reels[1] && reels[1] === reels[2]) {
       const symbol = reels[0];
       const symbolIndex = SYMBOLS.indexOf(symbol);
       
-      // Higher payout for rarer symbols (later in array)
       const multiplier = (symbolIndex + 1) * 2;
       
-      // Special multiplier for 7️⃣
       if (symbol === "7️⃣") {
         return betAmount * 50;
       }
       
-      // Special multiplier for 💎
       if (symbol === "💎") {
         return betAmount * 20;
       }
@@ -82,9 +78,8 @@ export class SlotMachineGame implements IGame {
       return betAmount * multiplier;
     }
 
-    // Check for two of a kind
     if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2]) {
-      return betAmount * 1.5; // Small payout for pair
+      return betAmount * 1.5;
     }
 
     return 0;

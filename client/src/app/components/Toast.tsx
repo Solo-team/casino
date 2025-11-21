@@ -8,7 +8,7 @@ interface Props {
 const Toast: React.FC<Props> = ({ toast }) => {
   if (!toast) return null;
   return (
-    <div className={`toast show`} data-type={toast.type}>
+    <div className={`toast show`} data-type={toast.type} role="status" aria-live="polite">
       {toast.message}
     </div>
   );

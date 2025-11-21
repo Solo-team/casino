@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ApiGame, ApiGameResult, ApiProvider, ApiSlotGame, ApiUser } from "../../types/api";
-import { ApiService } from "../services/api";
+import { ApiService, setToken, getToken } from "../services/api";
 import type { GameContext } from "../types";
 
 const STORAGE_KEY = "casinoUser";
-
 const persistToStorage = (value: ApiUser | null) => {
   if (typeof window === "undefined") {
     return;
@@ -52,53 +51,51 @@ export function useCasino() {
     }
   }, []);
 
-  const loadInitialData = useCallback(
-    async (userId: string) => {
-      setDataLoading(true);
-      try {
-        const [gamesList, providerList, historyList] = await Promise.all([
-          ApiService.getGames(),
-          ApiService.getProviders(),
-          ApiService.getHistory(userId)
-        ]);
-        setGames(gamesList);
-        setProviders(providerList);
-        setHistory(historyList);
-        if (providerList.length) {
-          await selectProvider(providerList[0].id);
-        } else {
-          setSlots([]);
-          setSelectedProvider(null);
-        }
-      } finally {
-        setDataLoading(false);
+  const loadInitialData = useCallback(async () => {
+    setDataLoading(true);
+    try {
+      // Public data (available without auth)
+      const [gamesList, providerList] = await Promise.all([
+        ApiService.getGames(),
+        ApiService.getProviders()
+      ]);
+      setGames(gamesList);
+      setProviders(providerList);
+      if (providerList.length) {
+        await selectProvider(providerList[0].id);
+      } else {
+        setSlots([]);
+        setSelectedProvider(null);
       }
-    },
-    [selectProvider]
-  );
+
+      // Authenticated data (history + profile) if token exists
+      const token = getToken();
+      if (token) {
+        try {
+          const [userData, historyList] = await Promise.all([
+            ApiService.getCurrentUser(),
+            ApiService.getHistory()
+          ]);
+          persistUser(userData);
+          setHistory(historyList);
+        } catch (error) {
+          console.error("Failed to load user session, clearing token", error);
+          setToken(null);
+          persistToStorage(null);
+          setHistory([]);
+        }
+      } else {
+        persistUser(null);
+        setHistory([]);
+      }
+    } finally {
+      setDataLoading(false);
+    }
+  }, [persistUser, selectProvider]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (!saved) {
-      return;
-    }
-    try {
-      const stored = JSON.parse(saved) as ApiUser;
-      void ApiService.getUser(stored.id)
-        .then(async fetched => {
-          persistUser(fetched);
-          await loadInitialData(fetched.id);
-        })
-        .catch(() => {
-          persistToStorage(null);
-        });
-    } catch {
-      persistToStorage(null);
-    }
-  }, [loadInitialData, persistUser]);
+    void loadInitialData();
+  }, [loadInitialData]);
 
   const runAuthAction = useCallback(
     async (task: () => Promise<void>) => {
@@ -113,46 +110,47 @@ export function useCasino() {
   );
 
   const login = useCallback(
-    async (name: string) => {
-      const trimmed = name.trim();
-      if (!trimmed) {
+    async (name: string, password: string) => {
+      const trimmedName = name.trim();
+      const trimmedPassword = password.trim();
+      if (!trimmedName) {
         throw new Error("Enter nickname");
       }
+      if (!trimmedPassword) {
+        throw new Error("Enter password");
+      }
       await runAuthAction(async () => {
-        const fetched = await ApiService.getUserByName(trimmed);
-        persistUser(fetched);
-        await loadInitialData(fetched.id);
+        const response = await ApiService.login({ name: trimmedName, password: trimmedPassword });
+        setToken(response.token);
+        persistUser(response.user);
+        await loadInitialData();
       });
     },
     [loadInitialData, persistUser, runAuthAction]
   );
 
   const register = useCallback(
-    async (name: string, balance: number) => {
-      const trimmed = name.trim();
-      if (!trimmed) {
+    async (name: string, password: string, balance: number) => {
+      const trimmedName = name.trim();
+      const trimmedPassword = password.trim();
+      if (!trimmedName) {
         throw new Error("Enter nickname");
       }
-      await runAuthAction(async () => {
-        const created = await ApiService.createUser(trimmed, balance || 1000);
-        persistUser(created);
-        await loadInitialData(created.id);
-      });
-    },
-    [loadInitialData, persistUser, runAuthAction]
-  );
-
-  const loginWithGoogle = useCallback(
-    async (profile: { email: string; name: string }) => {
-      if (!profile.email.trim()) {
-        throw new Error("Google profile is missing email");
+      if (!trimmedPassword) {
+        throw new Error("Enter password");
+      }
+      if (trimmedPassword.length < 6) {
+        throw new Error("Password must be at least 6 characters");
       }
       await runAuthAction(async () => {
-        const emailKey = profile.email.trim().toLowerCase();
-        const existing = await ApiService.findUserByName(emailKey);
-        const account = existing ?? (await ApiService.createUser(emailKey, 1000));
-        persistUser(account);
-        await loadInitialData(account.id);
+        const response = await ApiService.registerUser({
+          name: trimmedName,
+          password: trimmedPassword,
+          initialBalance: balance || 1000
+        });
+        setToken(response.token);
+        persistUser(response.user);
+        await loadInitialData();
       });
     },
     [loadInitialData, persistUser, runAuthAction]
@@ -161,7 +159,7 @@ export function useCasino() {
   const deposit = useCallback(
     async (amount: number) => {
       if (!user) return;
-      const updated = await ApiService.deposit(user.id, amount);
+      const updated = await ApiService.deposit(amount);
       persistUser(updated);
     },
     [persistUser, user]
@@ -171,7 +169,7 @@ export function useCasino() {
     if (!user) return;
     setHistoryRefreshing(true);
     try {
-      const historyList = await ApiService.getHistory(user.id);
+      const historyList = await ApiService.getHistory();
       setHistory(historyList);
     } finally {
       setHistoryRefreshing(false);
@@ -194,12 +192,11 @@ export function useCasino() {
       setPlaying(true);
       try {
         const result = await ApiService.playGame({
-          userId: user.id,
           gameId: currentGame.id,
           betAmount
         });
         setLastGameResult(result);
-        const updatedUser = await ApiService.getUser(user.id);
+        const updatedUser = await ApiService.getCurrentUser();
         persistUser(updatedUser);
         await refreshHistory();
       } finally {
@@ -210,6 +207,7 @@ export function useCasino() {
   );
 
   const logout = useCallback(() => {
+    setToken(null);
     persistUser(null);
     setGames([]);
     setProviders([]);
@@ -255,7 +253,6 @@ export function useCasino() {
     ...state,
     login,
     register,
-    loginWithGoogle,
     deposit,
     logout,
     selectProvider,

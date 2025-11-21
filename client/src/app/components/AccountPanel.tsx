@@ -1,17 +1,15 @@
 import React, { useState } from "react";
 import type { ApiUser } from "../../types/api";
-import GoogleAuthButton from "./GoogleAuthButton";
 
 interface Props {
   user: ApiUser | null;
   onLogout: () => void;
   onLogin: (name: string) => Promise<void>;
   onRegister: (name: string, balance: number) => Promise<void>;
-  onGoogleLogin: (payload: { email: string; name: string }) => Promise<void>;
   isBusy: boolean;
 }
 
-const AccountPanel: React.FC<Props> = ({ user, onLogout, onLogin, onRegister, onGoogleLogin, isBusy }) => {
+const AccountPanel: React.FC<Props> = ({ user, onLogout, onLogin, onRegister, isBusy }) => {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [balance, setBalance] = useState(1000);
@@ -82,10 +80,6 @@ const AccountPanel: React.FC<Props> = ({ user, onLogout, onLogin, onRegister, on
           <button className="button button-primary" type="button" disabled={isBusy} onClick={handleSubmit}>
             {mode === "login" ? "Sign in" : "Create account"}
           </button>
-          <div className="divider">
-            <span>or</span>
-          </div>
-          <GoogleAuthButton disabled={isBusy} onCredential={payload => onGoogleLogin(payload)} />
         </>
       )}
     </section>

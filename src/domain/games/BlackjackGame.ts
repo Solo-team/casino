@@ -41,7 +41,6 @@ export class BlackjackGame implements IGame {
     const playerHand = this.dealHand(deck);
     const dealerHand = this.dealHand(deck);
 
-    // Player can hit or stand (simplified - auto play)
     let playerFinalHand = playerHand;
     if (gameData?.action === "hit" && !playerHand.isBusted && !playerHand.isBlackjack) {
       const newCard = deck.deal();
@@ -50,7 +49,6 @@ export class BlackjackGame implements IGame {
       }
     }
 
-    // Dealer plays (must hit on 16 or less, stand on 17+)
     let dealerFinalHand = dealerHand;
     while (dealerFinalHand.score < 17 && !dealerFinalHand.isBusted) {
       const newCard = deck.deal();
@@ -110,7 +108,6 @@ export class BlackjackGame implements IGame {
       score += value;
     }
 
-    // Adjust for aces
     while (score > 21 && aces > 0) {
       score -= 10;
       aces--;
@@ -161,14 +158,14 @@ export class BlackjackGame implements IGame {
     }
 
     if (resultType === GameResultType.DRAW) {
-      return betAmount; // Return bet
+      return betAmount;
     }
 
     if (isBlackjack) {
-      return betAmount * 2.5; // Blackjack pays 3:2
+      return betAmount * 2.5;
     }
 
-    return betAmount * 2; // Regular win pays 1:1
+    return betAmount * 2;
   }
 
   private generateGameId(): string {

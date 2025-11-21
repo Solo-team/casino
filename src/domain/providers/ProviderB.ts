@@ -78,7 +78,7 @@ export class ProviderB extends BaseSlotProvider {
       this.getRandomSymbol(),
       this.getRandomSymbol(),
       this.getRandomSymbol(),
-      this.getRandomSymbol() // 4 барабана для этого провайдера
+      this.getRandomSymbol()
     ];
   }
 
@@ -87,7 +87,6 @@ export class ProviderB extends BaseSlotProvider {
   }
 
   private calculatePayout(betAmount: number, reels: string[], gameId: string): number {
-    // Проверка на 4 одинаковых
     if (reels[0] === reels[1] && reels[1] === reels[2] && reels[2] === reels[3]) {
       const symbol = reels[0];
       const symbolIndex = SYMBOLS_B.indexOf(symbol);
@@ -105,7 +104,6 @@ export class ProviderB extends BaseSlotProvider {
       return betAmount * (symbolIndex + 1) * 4;
     }
 
-    // Проверка на 3 одинаковых
     const counts: Record<string, number> = {};
     for (const symbol of reels) {
       counts[symbol] = (counts[symbol] || 0) + 1;
@@ -118,7 +116,6 @@ export class ProviderB extends BaseSlotProvider {
       }
     }
 
-    // Проверка на 2 одинаковых
     for (const [_symbol, count] of Object.entries(counts)) {
       if (count >= 2) {
         return betAmount * 1.2;

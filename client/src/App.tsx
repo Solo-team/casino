@@ -9,6 +9,7 @@ import SidebarNav from "./app/components/SidebarNav";
 import Toast from "./app/components/Toast";
 import TopGamesSection from "./app/components/TopGamesSection";
 import AuthModal from "./app/components/AuthModal";
+import PersonalAccount from "./app/components/PersonalAccount";
 import { useCasino } from "./app/hooks/useCasino";
 import { useToast } from "./app/hooks/useToast";
 
@@ -18,6 +19,7 @@ const App: React.FC = () => {
   const [search, setSearch] = useState("");
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [showAccount, setShowAccount] = useState(false);
 
   const handleAuthError = (error: unknown, fallback: string) => {
     showToast(error instanceof Error ? error.message : fallback, "error");
@@ -46,58 +48,87 @@ const App: React.FC = () => {
             setAuthMode("register");
             setAuthModalOpen(true);
           }}
+          onAccountClick={() => setShowAccount(true)}
+          onLobbyClick={() => {
+            setShowAccount(false);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
         />
-        <CategoryTabs />
-        <div className="lobby-layout">
-          <SidebarNav />
-          <section className="lobby-main">
-            <HeroCarousel />
-            <GameFilters
-              search={search}
-              onSearch={value => setSearch(value)}
-              providers={casino.providers}
-              selectedProvider={casino.selectedProvider}
-              onProviderChange={providerId => {
-                void casino.selectProvider(providerId);
+        {showAccount ? (
+          <div className="lobby-layout account-view">
+            <PersonalAccount
+              user={casino.user}
+              history={casino.history}
+              onLogin={async (name, password) => {
+                await casino.login(name, password);
               }}
+              onRegister={async (name, password, balance) => {
+                await casino.register(name, password, balance);
+              }}
+              onDeposit={async (amount) => {
+                await casino.deposit(amount);
+                showToast("Balance updated", "success");
+              }}
+              onRefreshHistory={casino.refreshHistory}
+              isBusy={casino.isAuthBusy}
+              isHistoryRefreshing={casino.isHistoryRefreshing}
             />
-            <TopGamesSection games={filteredGames} onSelect={casino.openGame} />
-            {casino.slots.length > 0 && (
-              <section className="slots-teaser">
-                <div className="section-header">
-                  <h3>{casino.selectedProvider ? `Slots from ${selectedProviderName}` : "Popular slots"}</h3>
-                  <button className="button button-secondary" type="button" onClick={() => void casino.selectProvider(null)}>
-                    View all
-                  </button>
-                </div>
-                <div className="game-grid">
-                  {casino.slots.slice(0, 6).map(slot => (
-                    <article
-                      key={slot.id}
-                      className="slot-card"
-                      onClick={() =>
-                        casino.openGame({
-                          id: slot.id,
-                          name: slot.name,
-                          minBet: slot.minBet,
-                          maxBet: slot.maxBet,
-                          providerName: casino.selectedProvider ? selectedProviderName : undefined
-                        })
-                      }
-                    >
-                      <h4>{slot.name}</h4>
-                      <p className="muted">{slot.description ?? "Instant access, no download required."}</p>
-                      <small>
-                        Bets {slot.minBet} - {slot.maxBet}
-                      </small>
-                    </article>
-                  ))}
-                </div>
+          </div>
+        ) : (
+          <>
+            <CategoryTabs />
+            <div className="lobby-layout">
+              <SidebarNav />
+              <section className="lobby-main">
+                <HeroCarousel />
+                <GameFilters
+                  search={search}
+                  onSearch={value => setSearch(value)}
+                  providers={casino.providers}
+                  selectedProvider={casino.selectedProvider}
+                  onProviderChange={providerId => {
+                    void casino.selectProvider(providerId);
+                  }}
+                />
+                <TopGamesSection games={filteredGames} onSelect={casino.openGame} />
+                {casino.slots.length > 0 && (
+                  <section className="slots-teaser">
+                    <div className="section-header">
+                      <h3>{casino.selectedProvider ? `Slots from ${selectedProviderName}` : "Popular slots"}</h3>
+                      <button className="button button-secondary" type="button" onClick={() => void casino.selectProvider(null)}>
+                        View all
+                      </button>
+                    </div>
+                    <div className="game-grid">
+                      {casino.slots.slice(0, 6).map(slot => (
+                        <article
+                          key={slot.id}
+                          className="slot-card"
+                          onClick={() =>
+                            casino.openGame({
+                              id: slot.id,
+                              name: slot.name,
+                              minBet: slot.minBet,
+                              maxBet: slot.maxBet,
+                              providerName: casino.selectedProvider ? selectedProviderName : undefined
+                            })
+                          }
+                        >
+                          <h4>{slot.name}</h4>
+                          <p className="muted">{slot.description ?? "Instant access, no download required."}</p>
+                          <small>
+                            Bets {slot.minBet} - {slot.maxBet}
+                          </small>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
               </section>
-            )}
-          </section>
-          <PromoAside />
-        </div>
+              <PromoAside />
+            </div>
+          </>
+        )}
       </div>
 
       {casino.currentGame && (
@@ -121,7 +152,7 @@ const App: React.FC = () => {
         onClose={() => setAuthModalOpen(false)}
         onLogin={async ({ name, password }) => {
           try {
-            await casino.login(name);
+            await casino.login(name, password);
             showToast("Signed in successfully", "success");
             setAuthModalOpen(false);
           } catch (error) {
@@ -131,21 +162,11 @@ const App: React.FC = () => {
         }}
         onRegister={async ({ name, password, balance }) => {
           try {
-            await casino.register(name, balance ?? 1000);
+            await casino.register(name, password, balance ?? 1000);
             showToast("Registration successful", "success");
             setAuthModalOpen(false);
           } catch (error) {
             handleAuthError(error, "Registration error");
-            throw error;
-          }
-        }}
-        onGoogle={async payload => {
-          try {
-            await casino.loginWithGoogle(payload);
-            showToast("Signed in with Google", "success");
-            setAuthModalOpen(false);
-          } catch (error) {
-            handleAuthError(error, "Google sign-in failed");
             throw error;
           }
         }}

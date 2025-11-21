@@ -265,6 +265,10 @@ main {
   align-items: start;
 }
 
+.lobby-layout.account-view {
+  grid-template-columns: 1fr;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
