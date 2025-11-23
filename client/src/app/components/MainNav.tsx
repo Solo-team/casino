@@ -23,7 +23,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Blackjack Suites", description: "VIP tables, private hosts" },
       { label: "Roulette Royale", description: "Lightning, immersive variants" },
-      { label: "Baccarat Salon", description: "Salon Privé, squeeze tables" }
+      { label: "Baccarat Salon", description: "Salon Prive, squeeze tables" }
     ]
   },
   {
@@ -78,7 +78,7 @@ const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick, onAcco
               <button type="button" onClick={() => handleNavClick(item)}>
                 {item.label}
                 {item.tag && <span className="nav-tag">{item.tag}</span>}
-                {item.children && <span className="caret">⌄</span>}
+                {item.children && <span className="caret">v</span>}
               </button>
               {item.children && (
                 <div className="nav-dropdown">
@@ -114,7 +114,7 @@ const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick, onAcco
           <div className="mobile-nav__header">
             <span>Main menu</span>
             <button type="button" onClick={() => setMobileOpen(false)}>
-              ×
+              Close
             </button>
           </div>
           <div className="mobile-nav__tabs">

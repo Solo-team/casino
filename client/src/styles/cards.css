@@ -24,32 +24,6 @@
   border-color: rgba(255, 183, 3, 0.65);
 }
 
-.providers-wrapper {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 18px;
-}
-
-.providers-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.provider-card {
-  padding: 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.03);
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.provider-card.active {
-  border-color: rgba(255, 183, 3, 0.7);
-  background: rgba(255, 183, 3, 0.08);
-}
-
 .history-empty {
   text-align: center;
   padding: 20px;

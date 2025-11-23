@@ -9,22 +9,22 @@ interface Slide {
 
 const SLIDES: Slide[] = [
   {
-    title: "Kawaii Princess",
-    subtitle: "Royal adventure with daily boosters",
+    title: "Neon Protocol",
+    subtitle: "Co-op heists in zero gravity with pulse boosts",
     tag: "New",
-    accent: "linear-gradient(120deg, #1a1b6b, #7420a6)"
+    accent: "linear-gradient(120deg, #0a1d3d, #18a4ff)"
   },
   {
-    title: "Lightning Crush",
-    subtitle: "High-voltage reels and instant jackpots",
+    title: "Aether Drift",
+    subtitle: "Tumble mechanics with charged multipliers",
     tag: "Exclusive",
-    accent: "linear-gradient(120deg, #0f1f3f, #0958d2)"
+    accent: "linear-gradient(120deg, #1c0f3b, #7cf2ff)"
   },
   {
-    title: "Aviator Rush",
-    subtitle: "Climb the leaderboard before time runs out",
+    title: "Cyber Surge",
+    subtitle: "Jackpot traces, adaptive reels, instant duels",
     tag: "Tournament",
-    accent: "linear-gradient(120deg, #2a0b1a, #c61145)"
+    accent: "linear-gradient(120deg, #102231, #9bf94a)"
   }
 ];
 
@@ -53,8 +53,8 @@ const HeroCarousel: React.FC = () => {
           {index + 1} / {SLIDES.length}
         </span>
         <div className="arrows">
-          <button onClick={() => setIndex((index - 1 + SLIDES.length) % SLIDES.length)}>‹</button>
-          <button onClick={() => setIndex((index + 1) % SLIDES.length)}>›</button>
+          <button onClick={() => setIndex((index - 1 + SLIDES.length) % SLIDES.length)}>{"<"}</button>
+          <button onClick={() => setIndex((index + 1) % SLIDES.length)}>{">"}</button>
         </div>
       </div>
     </section>

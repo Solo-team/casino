@@ -2,18 +2,25 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 80 80'%3E%3Cg fill='%2307071a' fill-opacity='0.45'%3E%3Cpath d='M0 0h40v40H0zM40 40h40v40H40z'/%3E%3C/g%3E%3C/svg%3E");
-  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 80 80'%3E%3Cg fill='%23040816' fill-opacity='0.55'%3E%3Cpath d='M0 0h40v40H0zM40 40h40v40H40z'/%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.55;
   mix-blend-mode: screen;
   z-index: 0;
 }
 
 .app-shell {
-  max-width: 1280px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
-  padding: 0 24px 64px;
+  padding: 0 32px 72px;
   position: relative;
   z-index: 1;
+}
+
+@media (min-width: 1600px) {
+  .app-shell {
+    padding: 0 48px 80px;
+  }
 }
 
 .top-bar {
@@ -21,29 +28,47 @@
   align-items: center;
   justify-content: space-between;
   padding: 24px 0;
+  gap: 18px;
+  position: relative;
 }
 
 .logo {
   font-size: 1.4rem;
   font-weight: 700;
   letter-spacing: 0.08em;
+  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+  -webkit-background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 18px rgba(124, 242, 255, 0.35);
 }
 
 .primary-nav {
   display: flex;
   gap: 24px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(124, 242, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
 .primary-nav button {
   background: transparent;
   border: none;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.82);
   font-size: 0.95rem;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   cursor: pointer;
+  padding: 10px 4px;
+  position: relative;
+  transition: color 0.2s ease;
 }
 
 .primary-nav button.active {
+  color: var(--accent);
+}
+
+.primary-nav button:hover {
   color: var(--accent);
 }
 
@@ -56,11 +81,11 @@
   top: 140%;
   left: 0;
   min-width: 220px;
-  background: rgba(9, 10, 27, 0.97);
+  background: linear-gradient(165deg, rgba(7, 10, 26, 0.98), rgba(10, 14, 34, 0.96));
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(124, 242, 255, 0.12);
   padding: 14px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--shadow-xl);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-8px);
@@ -86,9 +111,13 @@
   margin-left: 6px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(124, 242, 255, 0.35);
   font-size: 0.65rem;
   text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  background: rgba(124, 242, 255, 0.12);
 }
 
 .nav-actions {
@@ -100,17 +129,18 @@
 .nav-toggle {
   display: none;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  border: 1px solid rgba(124, 242, 255, 0.35);
+  border-radius: 10px;
   color: var(--text);
   padding: 8px 12px;
+  box-shadow: var(--shadow-card);
 }
 
 .mobile-nav {
   position: fixed;
   inset: 0;
-  background: rgba(4, 6, 18, 0.96);
-  backdrop-filter: blur(6px);
+  background: linear-gradient(150deg, rgba(5, 8, 20, 0.95), rgba(6, 10, 26, 0.95));
+  backdrop-filter: blur(10px);
   z-index: 40;
   padding: 24px;
   display: flex;
@@ -236,32 +266,10 @@ main {
   max-width: 520px;
 }
 
-.category-tabs {
-  margin: 16px 0 24px;
-  display: flex;
-  gap: 18px;
-  font-size: 1.1rem;
-}
-
-.category-tabs button {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: inherit;
-}
-
-.category-tabs button.active {
-  color: #fff;
-  font-weight: 600;
-  border-bottom: 2px solid var(--accent);
-  padding-bottom: 6px;
-}
-
 .lobby-layout {
   display: grid;
-  grid-template-columns: 200px 1fr 290px;
-  gap: 20px;
+  grid-template-columns: 240px minmax(700px, 1fr) 320px;
+  gap: 24px;
   align-items: start;
 }
 
@@ -305,14 +313,16 @@ main {
 
 .hero-carousel {
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 28px;
+  border: 1px solid rgba(124, 242, 255, 0.12);
+  padding: 30px;
   color: #fff;
   min-height: 200px;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(124, 242, 255, 0.08);
+  position: relative;
+  overflow: hidden;
 }
 
 .hero-carousel h2 {
@@ -328,62 +338,30 @@ main {
 
 .hero-slider-controls {
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
 }
 
 .hero-slider-controls .arrows button {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  background: rgba(124, 242, 255, 0.16);
+  border: 1px solid rgba(124, 242, 255, 0.35);
+  border-radius: 12px;
+  width: 40px;
+  height: 40px;
   color: #fff;
   margin-left: 6px;
   cursor: pointer;
-}
-
-.filters-row {
-  display: grid;
-  grid-template-columns: 1fr 200px 140px;
-  gap: 12px;
-  align-items: center;
-}
-
-.top-games {
-  background: var(--surface);
-  border-radius: var(--radius-xl);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: var(--shadow-xl);
-  padding: 24px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
 .section-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  margin-bottom: 16px;
-}
-
-.game-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 16px;
-}
-
-.top-game-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
-  padding: 14px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
   gap: 10px;
-}
-
-.top-game-card .thumbnail {
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1), transparent);
-  border-radius: var(--radius-md);
-  height: 100px;
+  margin-bottom: 16px;
 }
 
 .promo-aside {

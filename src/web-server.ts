@@ -10,6 +10,8 @@ import { RouletteGame } from "./domain/games/RouletteGame";
 import { SlotMachineGame } from "./domain/games/SlotMachineGame";
 import { ProviderA } from "./domain/providers/ProviderA";
 import { ProviderB } from "./domain/providers/ProviderB";
+import { InteractiveProvider } from "./domain/providers/InteractiveProvider";
+import { MythicSlotsProvider } from "./domain/providers/MythicSlotsProvider";
 import { createApiRouter } from "./presentation/web/routes/api";
 import { createPaymentsRouter } from "./presentation/web/routes/payments";
 import { AppDataSource } from "./infrastructure/database/data-source";
@@ -88,6 +90,8 @@ const bootstrap = async (): Promise<void> => {
     ];
 
     const slotProviders = [
+      new MythicSlotsProvider(),
+      new InteractiveProvider(),
       new ProviderA(),
       new ProviderB()
     ];

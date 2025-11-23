@@ -1,13 +1,10 @@
 import React, { useState } from "react";
-import CategoryTabs from "./app/components/CategoryTabs";
-import GameFilters from "./app/components/GameFilters";
 import GameModal from "./app/components/GameModal";
 import HeroCarousel from "./app/components/HeroCarousel";
 import MainNav from "./app/components/MainNav";
 import PromoAside from "./app/components/PromoAside";
 import SidebarNav from "./app/components/SidebarNav";
 import Toast from "./app/components/Toast";
-import TopGamesSection from "./app/components/TopGamesSection";
 import AuthModal from "./app/components/AuthModal";
 import PersonalAccount from "./app/components/PersonalAccount";
 import DepositModal from "./app/components/DepositModal";
@@ -17,7 +14,6 @@ import { useToast } from "./app/hooks/useToast";
 const App: React.FC = () => {
   const casino = useCasino();
   const { toast, showToast } = useToast();
-  const [search, setSearch] = useState("");
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showAccount, setShowAccount] = useState(false);
@@ -26,15 +22,6 @@ const App: React.FC = () => {
   const handleAuthError = (error: unknown, fallback: string) => {
     showToast(error instanceof Error ? error.message : fallback, "error");
   };
-
-  const filteredGames = search
-    ? casino.games.filter(game => game.name.toLowerCase().includes(search.toLowerCase()))
-    : casino.games;
-
-  const selectedProviderName =
-    casino.selectedProvider && casino.providers.length
-      ? casino.providers.find(provider => provider.id === casino.selectedProvider)?.name ?? "Selected provider"
-      : undefined;
 
   return (
     <>
@@ -75,54 +62,16 @@ const App: React.FC = () => {
           </div>
         ) : (
           <>
-            <CategoryTabs />
             <div className="lobby-layout">
               <SidebarNav />
               <section className="lobby-main">
                 <HeroCarousel />
-                <GameFilters
-                  search={search}
-                  onSearch={value => setSearch(value)}
-                  providers={casino.providers}
-                  selectedProvider={casino.selectedProvider}
-                  onProviderChange={providerId => {
-                    void casino.selectProvider(providerId);
-                  }}
-                />
-                <TopGamesSection games={filteredGames} onSelect={casino.openGame} />
-                {casino.slots.length > 0 && (
-                  <section className="slots-teaser">
-                    <div className="section-header">
-                      <h3>{casino.selectedProvider ? `Slots from ${selectedProviderName}` : "Popular slots"}</h3>
-                      <button className="button button-secondary" type="button" onClick={() => void casino.selectProvider(null)}>
-                        View all
-                      </button>
-                    </div>
-                    <div className="game-grid">
-                      {casino.slots.slice(0, 6).map(slot => (
-                        <article
-                          key={slot.id}
-                          className="slot-card"
-                          onClick={() =>
-                            casino.openGame({
-                              id: slot.id,
-                              name: slot.name,
-                              minBet: slot.minBet,
-                              maxBet: slot.maxBet,
-                              providerName: casino.selectedProvider ? selectedProviderName : undefined
-                            })
-                          }
-                        >
-                          <h4>{slot.name}</h4>
-                          <p className="muted">{slot.description ?? "Instant access, no download required."}</p>
-                          <small>
-                            Bets {slot.minBet} - {slot.maxBet}
-                          </small>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                <section className="section-panel">
+                  <h3>Content coming soon</h3>
+                  <p className="muted">
+                    Providers and games will be added later by another teammate. For now, explore other sections or stay tuned.
+                  </p>
+                </section>
               </section>
               <PromoAside />
             </div>
@@ -136,9 +85,9 @@ const App: React.FC = () => {
           result={casino.lastGameResult}
           isPlaying={casino.isPlaying}
           onClose={casino.closeGame}
-          onPlay={async bet => {
+          onPlay={async (bet, gameData) => {
             try {
-              await casino.playGame(bet);
+              await casino.playGame(bet, gameData);
             } catch (error) {
               handleAuthError(error, "Unable to play");
             }

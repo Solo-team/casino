@@ -1,17 +1,21 @@
 .input {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(124, 242, 255, 0.22);
   border-radius: 14px;
   padding: 12px 14px;
   color: var(--text);
   font-size: 1rem;
   width: 100%;
-  transition: border 0.2s ease;
+  transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(6px);
 }
 
 .input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(124, 242, 255, 0.35), 0 12px 32px rgba(124, 242, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .button {
@@ -21,25 +25,28 @@
   font-weight: 600;
   border-radius: 16px;
   padding: 12px 20px;
-  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  letter-spacing: 0.03em;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
   font-family: inherit;
 }
 
 .button-primary {
-  background: linear-gradient(120deg, #ffb703, #ff6f61);
-  color: #0b0d1c;
-  box-shadow: 0 12px 35px rgba(255, 111, 97, 0.35);
+  background: linear-gradient(115deg, var(--accent), var(--accent-strong));
+  color: #03121d;
+  box-shadow: var(--glow-1);
 }
 
 .button-secondary {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(124, 242, 255, 0.08);
   color: var(--text);
+  border: 1px solid rgba(124, 242, 255, 0.2);
+  box-shadow: var(--shadow-card);
 }
 
 .button-ghost {
   background: transparent;
   color: var(--muted);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(124, 242, 255, 0.18);
   border-radius: 50px;
 }
 
@@ -73,7 +80,8 @@
 
 .button:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 15px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 15px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(124, 242, 255, 0.1);
+  filter: brightness(1.02);
 }
 
 .auth-grid {
@@ -200,6 +208,22 @@
   margin-top: 16px;
 }
 
+.showcase .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.casino-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* removed slot showcase styles (unused) */
+
 .dealer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -290,57 +314,6 @@
   color: var(--text);
 }
 
-.provider-detail {
-  margin: 16px 0;
-}
-
-.provider-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.provider-stats div {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-sm);
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.provider-stats span {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.provider-stats strong {
-  display: block;
-  font-size: 1.1rem;
-  margin-top: 4px;
-}
-
-.category-chips {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.category-chip {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: transparent;
-  border-radius: 999px;
-  padding: 6px 14px;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.category-chip.active {
-  border-color: rgba(255, 183, 3, 0.8);
-  color: var(--text);
-}
 .loyalty-card {
   display: flex;
   flex-direction: column;

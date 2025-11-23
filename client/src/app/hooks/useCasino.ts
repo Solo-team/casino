@@ -229,13 +229,14 @@ export function useCasino() {
   }, []);
 
   const playGame = useCallback(
-    async (betAmount: number) => {
+    async (betAmount: number, gameData?: Record<string, unknown>) => {
       if (!user || !currentGame) return;
       setPlaying(true);
       try {
         const result = await ApiService.playGame({
           gameId: currentGame.id,
-          betAmount
+          betAmount,
+          gameData
         });
         setLastGameResult(result);
         const updatedUser = await ApiService.getCurrentUser();
