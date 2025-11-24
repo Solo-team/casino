@@ -5,6 +5,7 @@ import cors from "cors";
 import path from "path";
 import { CasinoService } from "./application/services/CasinoService";
 import { PaymentService } from "./application/services/PaymentService";
+import { PaymentMethod } from "./domain/entities/PaymentTransaction";
 import { BlackjackGame } from "./domain/games/BlackjackGame";
 import { RouletteGame } from "./domain/games/RouletteGame";
 import { SlotMachineGame } from "./domain/games/SlotMachineGame";
@@ -21,6 +22,7 @@ import { TypeOrmPaymentRepository } from "./infrastructure/repositories/TypeOrmP
 import { StaticCryptoGateway } from "./infrastructure/payments/StaticCryptoGateway";
 import { NowPaymentsGateway } from "./infrastructure/payments/NowPaymentsGateway";
 import { CryptomusGateway } from "./infrastructure/payments/CryptomusGateway";
+import { PayPalGateway } from "./infrastructure/payments/PayPalGateway";
 
 dotenv.config();
 
@@ -29,6 +31,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
 const clientDistPath = path.join(__dirname, "../client/dist");
 const cryptoMinAmount = process.env.CRYPTO_MIN_AMOUNT ? Number(process.env.CRYPTO_MIN_AMOUNT) : undefined;
+const paypalMinAmount = process.env.PAYPAL_MIN_AMOUNT ? Number(process.env.PAYPAL_MIN_AMOUNT) : undefined;
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
@@ -115,6 +118,42 @@ const bootstrap = async (): Promise<void> => {
       });
 
     const webhookUrl = process.env.CRYPTO_WEBHOOK_PUBLIC_URL;
+    const paypalEnabled = Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+
+    const paypalGatewayFactory = () => {
+      const clientId = process.env.PAYPAL_CLIENT_ID;
+      const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        throw new Error("PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are required when enabling PayPal");
+      }
+      
+      const returnUrl = process.env.PAYPAL_RETURN_URL ?? process.env.CRYPTO_RETURN_URL;
+      const cancelUrl = process.env.PAYPAL_CANCEL_URL ?? process.env.CRYPTO_RETURN_URL;
+      
+      if (!returnUrl || returnUrl.includes("<") || returnUrl.includes("your-host") || returnUrl.includes("yourdomain")) {
+        throw new Error(
+          "PAYPAL_RETURN_URL is required and must be a valid URL. " +
+          "Current value: " + returnUrl + ". " +
+          "Example: http://localhost:5173/account?payment=success"
+        );
+      }
+      
+      if (!cancelUrl || cancelUrl.includes("<") || cancelUrl.includes("your-host") || cancelUrl.includes("yourdomain")) {
+        throw new Error(
+          "PAYPAL_CANCEL_URL is required and must be a valid URL. " +
+          "Current value: " + cancelUrl + ". " +
+          "Example: http://localhost:5173/account?payment=cancelled"
+        );
+      }
+      
+      return new PayPalGateway({
+        clientId,
+        clientSecret,
+        baseUrl: process.env.PAYPAL_BASE_URL,
+        returnUrl,
+        cancelUrl
+      });
+    };
 
     const nowPaymentsFactory = () => {
       const apiKey = process.env.NOWPAYMENTS_API_KEY;
@@ -226,6 +265,15 @@ const bootstrap = async (): Promise<void> => {
       }
     );
 
+    const paypalPaymentService = paypalEnabled
+      ? new PaymentService(userRepository, paymentRepository, paypalGatewayFactory(), {
+          defaultCurrency: process.env.PAYPAL_CURRENCY ?? "USD",
+          minimumAmount: paypalMinAmount,
+          providerName: "paypal",
+          method: PaymentMethod.PAYPAL
+        })
+      : undefined;
+
     app.use("/api", createApiRouter(casinoService));
     app.use(
       "/api/payments",
@@ -233,7 +281,8 @@ const bootstrap = async (): Promise<void> => {
         webhookSecret,
         signatureHeader,
         verifyWebhookSignature,
-        devMode: devCryptoMode
+        devMode: devCryptoMode,
+        paypalService: paypalPaymentService
       })
     );
 

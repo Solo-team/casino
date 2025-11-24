@@ -17,6 +17,7 @@ export interface PaymentServiceConfig {
   minimumAmount?: number;
   devMode?: boolean;
   providerName?: string;
+  method?: PaymentMethod;
 }
 
 export interface CreateCryptoDepositInput {
@@ -28,7 +29,7 @@ export interface CreateCryptoDepositInput {
 export interface CryptoDepositResponse {
   payment: PaymentTransaction;
   instructions: {
-    address: string;
+    address?: string;
     memo?: string;
     network?: string;
     amount: number;
@@ -54,7 +55,7 @@ export class PaymentService {
     private readonly config: PaymentServiceConfig = {}
   ) {}
 
-  async createCryptoDeposit(input: CreateCryptoDepositInput): Promise<CryptoDepositResponse> {
+  async createDeposit(input: CreateCryptoDepositInput): Promise<CryptoDepositResponse> {
     const amount = Number(input.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new Error("Deposit amount must be positive");
@@ -87,7 +88,7 @@ export class PaymentService {
       amount,
       currency,
       PaymentType.DEPOSIT,
-      PaymentMethod.CRYPTO,
+      this.config.method ?? PaymentMethod.CRYPTO,
       this.config.providerName || "crypto-gateway",
       gatewayResponse.providerPaymentId,
       gatewayResponse.address,
@@ -117,6 +118,14 @@ export class PaymentService {
     };
   }
 
+  async createCryptoDeposit(input: CreateCryptoDepositInput): Promise<CryptoDepositResponse> {
+    return this.createDeposit(input);
+  }
+
+  async createPaypalDeposit(input: CreateCryptoDepositInput): Promise<CryptoDepositResponse> {
+    return this.createDeposit(input);
+  }
+
   async findPaymentForUser(paymentId: string, userId: string): Promise<PaymentTransaction> {
     const payment = await this.paymentRepository.findById(paymentId);
     if (!payment || payment.userId !== userId) {
@@ -129,7 +138,7 @@ export class PaymentService {
     return this.paymentRepository.findByUserId(userId);
   }
 
-  async handleCryptoWebhook(payload: CryptoWebhookPayload): Promise<PaymentTransaction> {
+  async handleDepositWebhook(payload: CryptoWebhookPayload): Promise<PaymentTransaction> {
     const payment = await this.resolvePayment(payload);
 
     if (payload.status === "confirmed") {
@@ -149,6 +158,10 @@ export class PaymentService {
     }
     await this.paymentRepository.save(payment);
     return payment;
+  }
+
+  async handleCryptoWebhook(payload: CryptoWebhookPayload): Promise<PaymentTransaction> {
+    return this.handleDepositWebhook(payload);
   }
 
   async markCompleted(payment: PaymentTransaction, txHash?: string): Promise<PaymentTransaction> {

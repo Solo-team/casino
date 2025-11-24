@@ -1,5 +1,7 @@
 export type GameResultType = "WIN" | "LOSS" | "DRAW";
 export type PaymentStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "EXPIRED";
+export type PaymentMethod = "CRYPTO" | "PAYPAL";
+export type DepositMethod = "cryptomus" | "paypal";
 
 export interface ApiUser {
   id: string;
@@ -45,7 +47,7 @@ export interface ApiPayment {
   amount: number;
   currency: string;
   type: string;
-  method: string;
+  method: PaymentMethod;
   provider: string;
   providerPaymentId?: string;
   address?: string;
@@ -60,8 +62,8 @@ export interface ApiPayment {
   expiresAt?: string | null;
 }
 
-export interface CryptoDepositInstructions {
-  address: string;
+export interface DepositInstructions {
+  address?: string;
   memo?: string;
   network?: string;
   amount: number;
@@ -71,7 +73,9 @@ export interface CryptoDepositInstructions {
   expiresAt?: string | null;
 }
 
-export interface CreateCryptoDepositResponse {
+export interface CreateDepositResponse {
   payment: ApiPayment;
-  instructions: CryptoDepositInstructions;
+  instructions: DepositInstructions;
 }
+
+export type CreateCryptoDepositResponse = CreateDepositResponse;

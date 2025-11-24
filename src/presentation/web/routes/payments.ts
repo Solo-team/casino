@@ -7,6 +7,7 @@ interface PaymentRouterOptions {
   devMode?: boolean;
   signatureHeader?: string;
   verifyWebhookSignature?: (params: { req: Request; rawBody?: string | Buffer; signature?: string | string[] }) => boolean;
+  paypalService?: PaymentService;
 }
 
 const normalizeStatusValue = (value?: string | number | null): string | null => {
@@ -33,6 +34,9 @@ const processingStatuses = new Set([
   "pending",
   "confirming",
   "waiting",
+  "approved",
+  "created",
+  "authorized",
   "partially_paid",
   "part_paid",
   "check",
@@ -44,7 +48,8 @@ const processingStatuses = new Set([
   "invoice_created",
   "link_waiting",
   "hold",
-  "on_hold"
+  "on_hold",
+  "payer_action_required"
 ]);
 
 const failedStatuses = new Set([
@@ -66,6 +71,7 @@ const failedStatuses = new Set([
   "payment_failed",
   "declined",
   "void",
+  "voided",
   "payment_canceled",
   "payment_cancelled"
 ]);
@@ -127,6 +133,35 @@ export function createPaymentsRouter(
     }
   );
 
+  router.post(
+    "/paypal/deposits",
+    authMiddleware,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        if (!req.userId) {
+          res.status(401).json({ error: "Unauthorized" });
+          return;
+        }
+        if (!options.paypalService) {
+          res.status(404).json({ error: "PayPal payments are not enabled" });
+          return;
+        }
+        const { amount, currency } = req.body;
+        const deposit = await options.paypalService.createPaypalDeposit({
+          userId: req.userId,
+          amount,
+          currency
+        });
+        res.status(201).json({
+          payment: deposit.payment.toJSON(),
+          instructions: deposit.instructions
+        });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message || "Unable to create PayPal deposit" });
+      }
+    }
+  );
+
   router.get("/", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       if (!req.userId) {
@@ -153,7 +188,7 @@ export function createPaymentsRouter(
     }
   });
 
-  router.post("/crypto/webhook", async (req: Request, res: Response) => {
+  const webhookHandler = async (req: Request, res: Response) => {
     try {
       const rawBody = (req as Request & { rawBody?: string | Buffer }).rawBody;
       const signatureHeader = options.signatureHeader ?? "x-webhook-secret";
@@ -195,16 +230,22 @@ export function createPaymentsRouter(
         return;
       }
 
-      const payment = await paymentService.handleCryptoWebhook({
+      const payment = await paymentService.handleDepositWebhook({
         paymentId:
           payload.paymentId ??
           (payload as Record<string, string | undefined>).order_id ??
-          (payload as Record<string, string | undefined>).orderId,
+          (payload as Record<string, string | undefined>).orderId ??
+          toOptionalString((payload as { resource?: Record<string, unknown> }).resource?.invoice_id),
         providerPaymentId:
           payload.providerPaymentId ??
           toOptionalString((payload as Record<string, unknown>).payment_id) ??
           toOptionalString((payload as Record<string, unknown>).uuid) ??
-          toOptionalString((payload as Record<string, unknown>).payment_uuid),
+          toOptionalString((payload as Record<string, unknown>).payment_uuid) ??
+          toOptionalString((payload as { resource?: Record<string, unknown> }).resource?.id) ??
+          toOptionalString(
+            (payload as { resource?: { supplementary_data?: { related_ids?: { order_id?: unknown } } } }).resource
+              ?.supplementary_data?.related_ids?.order_id
+          ),
         status: normalizedStatus,
         txHash:
           payload.txHash ??
@@ -219,7 +260,10 @@ export function createPaymentsRouter(
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Webhook processing failed" });
     }
-  });
+  };
+
+  router.post("/crypto/webhook", webhookHandler);
+  router.post("/paypal/webhook", webhookHandler);
 
   router.post("/:paymentId/confirm", async (req: Request, res: Response) => {
     if (!options.devMode) {
@@ -227,7 +271,7 @@ export function createPaymentsRouter(
       return;
     }
     try {
-      const payment = await paymentService.handleCryptoWebhook({
+      const payment = await paymentService.handleDepositWebhook({
         paymentId: req.params.paymentId,
         status: "confirmed",
         txHash: (req.body as { txHash?: string }).txHash

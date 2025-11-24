@@ -18,7 +18,7 @@ const AuthSection: React.FC<Props> = ({ onLogin, onRegister, isBusy }) => {
           <h2>Sign in</h2>
           <p className="muted">Pick up where you left off and access your live tables.</p>
           <label>
-            Никнейм
+            Nickname
             <input
               className="input"
               type="text"
@@ -40,7 +40,7 @@ const AuthSection: React.FC<Props> = ({ onLogin, onRegister, isBusy }) => {
           <h2>Create account</h2>
           <p className="muted">Open a Venom Lounge profile with a complimentary bankroll.</p>
           <label>
-            Никнейм
+            Nickname
             <input
               className="input"
               type="text"

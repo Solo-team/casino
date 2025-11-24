@@ -1,16 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type {
-  ApiPayment,
-  CreateCryptoDepositResponse,
-  PaymentStatus
-} from "../../types/api";
+import type { ApiPayment, CreateDepositResponse, DepositMethod, PaymentStatus } from "../../types/api";
 import { formatCurrency } from "../utils/format";
+import { ApiError } from "../services/api";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreateDeposit: (amount: number) => Promise<CreateCryptoDepositResponse>;
+  onCreateDeposit: (params: { amount: number; method: DepositMethod }) => Promise<CreateDepositResponse>;
   onRefreshPayment: (paymentId: string) => Promise<ApiPayment>;
   onBalanceRefresh: () => Promise<void>;
 }
@@ -32,6 +29,16 @@ const statusTone: Record<PaymentStatus, "neutral" | "warning" | "positive" | "ne
 };
 
 const DEFAULT_AMOUNT = 50;
+const QUICK_AMOUNTS = [25, 50, 100, 250, 500, 1000];
+
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const DepositModal: React.FC<Props> = ({
   open,
@@ -41,11 +48,14 @@ const DepositModal: React.FC<Props> = ({
   onBalanceRefresh
 }) => {
   const [amount, setAmount] = useState<number>(DEFAULT_AMOUNT);
+  const [method, setMethod] = useState<DepositMethod>("cryptomus");
+  const [step, setStep] = useState<"method" | "form">("method");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [isRefreshing, setRefreshing] = useState(false);
-  const [deposit, setDeposit] = useState<CreateCryptoDepositResponse | null>(null);
+  const [deposit, setDeposit] = useState<CreateDepositResponse | null>(null);
   const [payment, setPayment] = useState<ApiPayment | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -53,6 +63,8 @@ const DepositModal: React.FC<Props> = ({
       setError(null);
       setDeposit(null);
       setPayment(null);
+      setMethod("cryptomus");
+      setStep("method");
     }
   }, [open]);
 
@@ -77,13 +89,27 @@ const DepositModal: React.FC<Props> = ({
 
   const handleSubmit = async (event?: React.FormEvent) => {
     event?.preventDefault();
+    if (!method) {
+      setError("Select a payment method");
+      return;
+    }
     try {
       setSubmitting(true);
       setError(null);
-      const response = await onCreateDeposit(amount);
+      const response = await onCreateDeposit({ amount, method });
       setDeposit(response);
       setPayment(response.payment);
+      
+      if (response.instructions.checkoutUrl) {
+        setTimeout(() => {
+          window.open(response.instructions.checkoutUrl, "_blank");
+        }, 500);
+      }
     } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setError("This payment method is not enabled on the server. Please switch method or contact support.");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Unable to create deposit");
     } finally {
       setSubmitting(false);
@@ -103,13 +129,57 @@ const DepositModal: React.FC<Props> = ({
     }
   };
 
+  const handleCopy = async (text: string, field: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    }
+  };
+
   const status = (payment?.status ?? "PENDING") as PaymentStatus;
   const tone = statusTone[status];
   const expiresAt = payment?.expiresAt ? new Date(payment.expiresAt) : null;
   const statusLabel = statusText[status] ?? "Waiting for payment";
-
   const instructions = deposit?.instructions;
   const hasAddress = Boolean(instructions?.address);
+  const paymentMethod = payment?.method || deposit?.payment.method;
+  const isPaypal = paymentMethod === "PAYPAL" || method === "paypal";
+  const currentCurrency = instructions?.currency ?? (isPaypal ? "USD" : "USDT");
+  const minAmount = isPaypal ? 5 : 10;
+  const amountStep = isPaypal ? "1" : "10";
+  const checkoutCardTitle = isPaypal ? "Pay with PayPal" : "Pay via hosted checkout";
+  const checkoutCardBody = isPaypal
+    ? "Use the PayPal checkout link to approve and fund your balance."
+    : "Open the checkout page to get the address and memo for this payment.";
+
+  const handleSelectMethod = (value: DepositMethod) => {
+    setMethod(value);
+    setStep("form");
+  };
+
+  const MethodToggleRow = (
+    <div className="method-toggle-group" role="group" aria-label="Select payment method">
+      <button
+        type="button"
+        className={`method-toggle ${method === "cryptomus" ? "active" : ""}`}
+        onClick={() => handleSelectMethod("cryptomus")}
+        disabled={isSubmitting}
+      >
+        <span className="emoji">🪙</span>
+        Cryptomus · USDT
+      </button>
+      <button
+        type="button"
+        className={`method-toggle ${method === "paypal" ? "active" : ""}`}
+        onClick={() => handleSelectMethod("paypal")}
+        disabled={isSubmitting}
+      >
+        <span className="emoji">💳</span>
+        PayPal · USD
+      </button>
+    </div>
+  );
 
   const content = (
     <div className="modal" role="dialog" aria-modal="true">
@@ -119,36 +189,140 @@ const DepositModal: React.FC<Props> = ({
         </button>
         <header className="deposit-modal__header">
           <div>
-            <p className="eyebrow">Crypto top-up</p>
+            <p className="eyebrow">Add funds</p>
             <h2>Fund your balance</h2>
-            <p className="muted">Send stablecoins and your bankroll updates automatically.</p>
+            <p className="muted">
+              {isPaypal
+                ? "Pay with PayPal and come back after approval to refresh status."
+                : "Send stablecoins and your bankroll updates automatically."}
+            </p>
           </div>
-          <div className={`status-chip status-chip--${tone}`}>
-            <span className="dot" />
-            <span>{statusLabel}</span>
-          </div>
+          {deposit && (
+            <div className="status-indicator">
+              <div className={`status-chip status-chip--${tone}`}>
+                <span className="dot" />
+                <span>{statusLabel}</span>
+              </div>
+              <div className="status-progress">
+                <div
+                  className={`status-progress__bar status-progress__bar--${status.toLowerCase()}`}
+                  style={{
+                    width:
+                      status === "PENDING"
+                        ? "20%"
+                        : status === "PROCESSING"
+                        ? "60%"
+                        : status === "COMPLETED"
+                        ? "100%"
+                        : "0%"
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          {!deposit && (
+            <div className={`status-chip status-chip--neutral`}>
+              <span className="dot" />
+              <span>Ready</span>
+            </div>
+          )}
         </header>
 
-        {!deposit && (
+        {!deposit && MethodToggleRow}
+
+        {!deposit && step === "method" && (
+          <div className="deposit-form">
+            <p className="muted">Choose how you want to top up.</p>
+            <div className="method-grid">
+              <button
+                type="button"
+                className={`method-card ${method === "cryptomus" ? "selected" : ""}`}
+                onClick={() => handleSelectMethod("cryptomus")}
+                disabled={isSubmitting}
+              >
+                <div className="method-card__icon">🪙</div>
+                <div className="method-card__content">
+                  <p className="eyebrow">Cryptomus</p>
+                  <strong>USDT</strong>
+                  <p className="muted small">Send stablecoins with memo tag. Instant deposits.</p>
+                  <div className="method-card__badges">
+                    <span className="method-badge">Fast</span>
+                    <span className="method-badge">Secure</span>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                className={`method-card ${method === "paypal" ? "selected" : ""}`}
+                onClick={() => handleSelectMethod("paypal")}
+                disabled={isSubmitting}
+              >
+                <div className="method-card__icon">💳</div>
+                <div className="method-card__content">
+                  <p className="eyebrow">PayPal</p>
+                  <strong>USD</strong>
+                  <p className="muted small">Approve with your PayPal account. Trusted payment.</p>
+                  <div className="method-card__badges">
+                    <span className="method-badge">Popular</span>
+                    <span className="method-badge">Easy</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!deposit && step === "form" && (
           <form className="deposit-form" onSubmit={handleSubmit}>
+            <div className="pill-row">
+              <span className="pill">
+                {method === "paypal" ? "PayPal" : "Cryptomus"} deposit
+              </span>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => setStep("method")}
+                disabled={isSubmitting}
+              >
+                Change method
+              </button>
+            </div>
+            <div className="quick-amounts-row">
+              <p className="eyebrow">Quick amounts</p>
+              <div className="quick-amounts">
+                {QUICK_AMOUNTS.map(quickAmount => (
+                  <button
+                    key={quickAmount}
+                    type="button"
+                    className={`quick-amount-btn ${amount === quickAmount ? "active" : ""}`}
+                    onClick={() => setAmount(quickAmount)}
+                    disabled={isSubmitting}
+                  >
+                    {formatCurrency(quickAmount)}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label>
               Amount
               <div className="input-with-addon">
                 <input
                   className="input"
                   type="number"
-                  min={10}
-                  step="10"
+                  min={minAmount}
+                  step={amountStep}
                   value={amount}
                   onChange={event => setAmount(Number(event.target.value))}
-                  placeholder="Amount in USDT"
+                  placeholder={`Amount in ${currentCurrency}`}
                   required
                 />
-                <span className="addon">USDT</span>
+                <span className="addon">{currentCurrency}</span>
               </div>
             </label>
             <p className="muted deposit-hint">
-              Only stablecoin deposits are accepted at the moment. A memo tag will be attached to your request.
+              {method === "paypal"
+                ? "You will be redirected to PayPal to complete the payment. After approval, return here to check status."
+                : "You will be redirected to Cryptomus checkout page. Complete payment there, then return here to check status."}
             </p>
             {error && (
               <div className="error-message" role="alert">
@@ -169,51 +343,88 @@ const DepositModal: React.FC<Props> = ({
 
         {deposit && instructions && (
           <div className="deposit-instructions">
-            <div className="instruction-grid">
+            {instructions.checkoutUrl ? (
+              <div className="checkout-redirect">
+                <div className="checkout-redirect__info">
+                  <div className="checkout-redirect__icon">↗</div>
+                  <div>
+                    <strong>Redirecting to {isPaypal ? "PayPal" : "Cryptomus"}...</strong>
+                    <p className="muted small">
+                      {isPaypal
+                        ? "Complete payment on PayPal, then return here to check status."
+                        : "Complete payment on Cryptomus, then return here to check status."}
+                    </p>
+                  </div>
+                </div>
+                <a
+                  className="button button-primary full-width"
+                  href={instructions.checkoutUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {isPaypal ? "Continue to PayPal" : "Continue to Cryptomus"}
+                </a>
+                <button
+                  className="button button-secondary full-width"
+                  type="button"
+                  onClick={() => {
+                    if (instructions.checkoutUrl) {
+                      window.open(instructions.checkoutUrl, "_blank");
+                    }
+                  }}
+                >
+                  Open in new tab
+                </button>
+              </div>
+            ) : (
+              <div className="instruction-grid">
               {hasAddress && (
-                <div className="instruction-card">
-                  <p className="eyebrow">Send to</p>
-                  <div className="mono">{instructions.address}</div>
+                <div className="instruction-card instruction-card--highlight">
+                  <div className="instruction-card__header">
+                    <p className="eyebrow">Send to</p>
+                    <button
+                      type="button"
+                      className="copy-btn"
+                      onClick={() => instructions.address && handleCopy(instructions.address, "address")}
+                      title="Copy address"
+                    >
+                      {copiedField === "address" ? "✓" : "📋"}
+                    </button>
+                  </div>
+                  <div className="mono instruction-value">{instructions.address}</div>
                   <small className="muted">{instructions.network || "USDT network"}</small>
                 </div>
               )}
-              {!hasAddress && instructions.checkoutUrl && (
-                <div className="instruction-card">
-                  <p className="eyebrow">Pay via hosted checkout</p>
-                  <div>Open the checkout page to get the address and memo for this payment.</div>
-                  <small className="muted">Cryptomus shows the final details inside the checkout flow.</small>
-                </div>
-              )}
               {instructions.memo && hasAddress && (
-                <div className="instruction-card">
-                  <p className="eyebrow">Memo / Reference</p>
-                  <div className="mono">{instructions.memo}</div>
+                <div className="instruction-card instruction-card--highlight">
+                  <div className="instruction-card__header">
+                    <p className="eyebrow">Memo / Reference</p>
+                    <button
+                      type="button"
+                      className="copy-btn"
+                      onClick={() => instructions.memo && handleCopy(instructions.memo, "memo")}
+                      title="Copy memo"
+                    >
+                      {copiedField === "memo" ? "✓" : "📋"}
+                    </button>
+                  </div>
+                  <div className="mono instruction-value">{instructions.memo}</div>
                   <small className="muted">Include this tag so we can match the deposit.</small>
                 </div>
               )}
               <div className="instruction-card">
                 <p className="eyebrow">Amount</p>
-                <strong>{formatCurrency(instructions.amount)}</strong>
+                <strong className="instruction-amount">{formatCurrency(instructions.amount)}</strong>
                 <small className="muted">{instructions.currency}</small>
               </div>
               {expiresAt && (
                 <div className="instruction-card">
                   <p className="eyebrow">Expires</p>
-                  <div>{expiresAt.toLocaleString()}</div>
+                  <div className="instruction-time">{expiresAt.toLocaleString()}</div>
                   <small className="muted">Send before this time to avoid delays.</small>
                 </div>
               )}
-            </div>
-
-            {deposit.instructions.checkoutUrl && (
-              <a
-                className="button button-secondary full-width"
-                href={deposit.instructions.checkoutUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open hosted checkout
-              </a>
+              </div>
             )}
 
             <div className="deposit-status-panel">
@@ -245,8 +456,19 @@ const DepositModal: React.FC<Props> = ({
               </div>
             )}
             {payment?.status === "COMPLETED" && (
-              <div className="success-banner">
-                <strong>Funds credited.</strong> Your balance has been updated.
+              <div className="success-banner success-banner--animated">
+                <div className="success-banner__icon">✓</div>
+                <div>
+                  <strong>Funds credited.</strong> Your balance has been updated.
+                </div>
+              </div>
+            )}
+            {payment?.status === "PROCESSING" && (
+              <div className="processing-banner">
+                <div className="processing-banner__spinner" />
+                <div>
+                  <strong>Payment detected.</strong> Waiting for blockchain confirmation...
+                </div>
               </div>
             )}
             {error && (

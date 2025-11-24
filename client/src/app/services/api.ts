@@ -5,7 +5,7 @@ import type {
   ApiProvider,
   ApiSlotGame,
   ApiUser,
-  CreateCryptoDepositResponse
+  CreateDepositResponse
 } from "../../types/api";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -25,7 +25,7 @@ export function setToken(token: string | null): void {
   }
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
     super(message);
     this.name = "ApiError";
@@ -115,7 +115,12 @@ export const ApiService = {
     }),
   getHistory: () => request<ApiGameResult[]>(`/users/history`),
   createCryptoDeposit: (payload: { amount: number; currency?: string }) =>
-    request<CreateCryptoDepositResponse>(`/payments/crypto/deposits`, {
+    request<CreateDepositResponse>(`/payments/crypto/deposits`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  createPaypalDeposit: (payload: { amount: number; currency?: string }) =>
+    request<CreateDepositResponse>(`/payments/paypal/deposits`, {
       method: "POST",
       body: JSON.stringify(payload)
     }),

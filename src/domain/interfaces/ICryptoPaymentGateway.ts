@@ -9,7 +9,7 @@ export interface CryptoDepositRequest {
 
 export interface CryptoDepositResult {
   providerPaymentId: string;
-  address: string;
+  address?: string;
   memo?: string;
   network?: string;
   expiresAt?: Date | null;

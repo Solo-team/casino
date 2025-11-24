@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import GameModal from "./app/components/GameModal";
 import HeroCarousel from "./app/components/HeroCarousel";
 import MainNav from "./app/components/MainNav";
@@ -18,6 +18,28 @@ const App: React.FC = () => {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showAccount, setShowAccount] = useState(false);
   const [isDepositOpen, setDepositOpen] = useState(false);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get("payment");
+    
+    if (paymentStatus === "success" || paymentStatus === "cancelled") {
+      setShowAccount(true);
+      
+      if (paymentStatus === "success") {
+        showToast("Returned from PayPal. Checking payment status...", "success");
+        if (casino.user) {
+          casino.refreshUser();
+          casino.refreshHistory();
+        }
+        setDepositOpen(true);
+      } else if (paymentStatus === "cancelled") {
+        showToast("Payment was cancelled", "error");
+      }
+      
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [casino.user, showToast, casino.refreshUser, casino.refreshHistory]);
 
   const handleAuthError = (error: unknown, fallback: string) => {
     showToast(error instanceof Error ? error.message : fallback, "error");
@@ -97,10 +119,14 @@ const App: React.FC = () => {
       <DepositModal
         open={isDepositOpen}
         onClose={() => setDepositOpen(false)}
-        onCreateDeposit={async (amount) => {
+        onCreateDeposit={async ({ amount, method }) => {
           try {
-            const response = await casino.createCryptoDeposit(amount);
-            showToast("Deposit created. Follow the crypto instructions.", "success");
+            const response =
+              method === "paypal"
+                ? await casino.createPaypalDeposit(amount)
+                : await casino.createCryptoDeposit(amount);
+            const methodLabel = response.payment.method === "PAYPAL" ? "PayPal" : "crypto";
+            showToast(`Deposit created. Follow the ${methodLabel} instructions.`, "success");
             return response;
           } catch (error) {
             handleAuthError(error, "Unable to create deposit");

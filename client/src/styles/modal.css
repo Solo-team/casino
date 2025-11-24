@@ -22,6 +22,18 @@
   padding: 32px;
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.6);
   position: relative;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .close-btn {

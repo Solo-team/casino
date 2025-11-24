@@ -7,7 +7,8 @@ export enum PaymentStatus {
 }
 
 export enum PaymentMethod {
-  CRYPTO = "CRYPTO"
+  CRYPTO = "CRYPTO",
+  PAYPAL = "PAYPAL"
 }
 
 export enum PaymentType {

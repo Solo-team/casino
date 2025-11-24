@@ -6,7 +6,8 @@ import type {
   ApiProvider,
   ApiSlotGame,
   ApiUser,
-  CreateCryptoDepositResponse
+  CreateDepositResponse,
+  DepositMethod
 } from "../../types/api";
 import { ApiService, setToken, getToken } from "../services/api";
 import type { GameContext } from "../types";
@@ -184,16 +185,31 @@ export function useCasino() {
     return updated;
   }, [persistUser, user]);
 
-  const createCryptoDeposit = useCallback(
-    async (amount: number, currency?: string): Promise<CreateCryptoDepositResponse> => {
+  const createDeposit = useCallback(
+    async (method: DepositMethod, amount: number, currency?: string): Promise<CreateDepositResponse> => {
       if (!user) {
         throw new Error("Sign in to create a deposit");
       }
-      const response = await ApiService.createCryptoDeposit({ amount, currency });
+      const response =
+        method === "paypal"
+          ? await ApiService.createPaypalDeposit({ amount, currency })
+          : await ApiService.createCryptoDeposit({ amount, currency });
       setLastPayment(response.payment);
       return response;
     },
     [user]
+  );
+
+  const createCryptoDeposit = useCallback(
+    async (amount: number, currency?: string): Promise<CreateDepositResponse> =>
+      createDeposit("cryptomus", amount, currency),
+    [createDeposit]
+  );
+
+  const createPaypalDeposit = useCallback(
+    async (amount: number, currency?: string): Promise<CreateDepositResponse> =>
+      createDeposit("paypal", amount, currency),
+    [createDeposit]
   );
 
   const fetchPayment = useCallback(
@@ -306,7 +322,9 @@ export function useCasino() {
     closeGame,
     playGame,
     refreshHistory,
+    createDeposit,
     createCryptoDeposit,
+    createPaypalDeposit,
     fetchPayment
   };
 }
