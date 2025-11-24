@@ -6,40 +6,94 @@ interface PaymentRouterOptions {
   webhookSecret?: string;
   devMode?: boolean;
   signatureHeader?: string;
-  verifyWebhookSignature?: (params: { req: Request; rawBody?: string | Buffer; signature?: string }) => boolean;
+  verifyWebhookSignature?: (params: { req: Request; rawBody?: string | Buffer; signature?: string | string[] }) => boolean;
 }
 
-const mapStatus = (status?: string): CryptoWebhookPayload["status"] | null => {
-  if (!status) return null;
-  const normalized = status.toLowerCase();
-  if (["confirmed", "completed", "paid", "paid_over", "success", "finished"].includes(normalized)) {
-    return "confirmed";
+const normalizeStatusValue = (value?: string | number | null): string | null => {
+  if (value === undefined || value === null) return null;
+  const text = typeof value === "number" ? value.toString() : value;
+  return text.trim().toLowerCase().replace(/[\s-]+/g, "_");
+};
+
+const confirmedStatuses = new Set([
+  "confirmed",
+  "completed",
+  "paid",
+  "paid_over",
+  "paid_overpayment",
+  "success",
+  "finished",
+  "finish",
+  "complete",
+  "confirm_check"
+]);
+
+const processingStatuses = new Set([
+  "processing",
+  "pending",
+  "confirming",
+  "waiting",
+  "partially_paid",
+  "part_paid",
+  "check",
+  "check_processing",
+  "checking",
+  "paid_status_unknown",
+  "process",
+  "invoice",
+  "invoice_created",
+  "link_waiting",
+  "hold",
+  "on_hold"
+]);
+
+const failedStatuses = new Set([
+  "failed",
+  "fail",
+  "canceled",
+  "cancelled",
+  "cancel",
+  "rejected",
+  "reject",
+  "refunded",
+  "refund",
+  "wrong_payment",
+  "wrong_amount",
+  "wrong_amount_less",
+  "wrong_amount_more",
+  "error",
+  "not_paid",
+  "payment_failed",
+  "declined",
+  "void",
+  "payment_canceled",
+  "payment_cancelled"
+]);
+
+const expiredStatuses = new Set(["expired", "timeout", "expire", "timed_out", "overdue", "time_expired"]);
+
+const mapStatus = (
+  status?: string | number | null,
+  context?: { state?: string | number | null }
+): CryptoWebhookPayload["status"] | null => {
+  const candidates = [
+    normalizeStatusValue(status),
+    normalizeStatusValue(context?.state)
+  ].filter(Boolean) as string[];
+
+  for (const value of candidates) {
+    if (confirmedStatuses.has(value)) return "confirmed";
+    if (processingStatuses.has(value)) return "processing";
+    if (failedStatuses.has(value)) return "failed";
+    if (expiredStatuses.has(value)) return "expired";
   }
-  if (
-    [
-      "processing",
-      "pending",
-      "confirming",
-      "waiting",
-      "partially_paid",
-      "check",
-      "check_processing",
-      "paid_status_unknown"
-    ].includes(normalized)
-  ) {
-    return "processing";
-  }
-  if (
-    ["failed", "canceled", "cancelled", "rejected", "refunded", "wrong_payment", "wrong_amount"].includes(
-      normalized
-    )
-  ) {
-    return "failed";
-  }
-  if (["expired", "timeout", "expire"].includes(normalized)) {
-    return "expired";
-  }
+
   return null;
+};
+
+const toOptionalString = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  return String(value);
 };
 
 export function createPaymentsRouter(
@@ -103,9 +157,10 @@ export function createPaymentsRouter(
     try {
       const rawBody = (req as Request & { rawBody?: string | Buffer }).rawBody;
       const signatureHeader = options.signatureHeader ?? "x-webhook-secret";
-      const providedSecret =
-        (req.headers[signatureHeader] as string | undefined) ||
-        (req.headers["x-signature"] as string | undefined);
+      const providedSecretHeader = req.headers[signatureHeader] ?? req.headers["x-signature"];
+      const providedSecret = Array.isArray(providedSecretHeader)
+        ? providedSecretHeader[0]
+        : (providedSecretHeader as string | undefined);
 
       if (options.verifyWebhookSignature) {
         const valid = options.verifyWebhookSignature({
@@ -122,27 +177,43 @@ export function createPaymentsRouter(
         return;
       }
 
-      const payload = req.body as Partial<CryptoWebhookPayload> &
-        Record<string, string | number | undefined> & { status?: string };
+      const payload = req.body as Partial<CryptoWebhookPayload> & Record<string, unknown> & {
+        status?: string | number;
+      };
+
+      const statusValue =
+        payload.status ??
+        (payload as Record<string, string | number | undefined>).payment_status ??
+        (payload as Record<string, string | number | undefined>).paymentStatus;
 
       const normalizedStatus =
-        mapStatus(payload.status ?? (payload as Record<string, string>).payment_status) || null;
+        mapStatus(statusValue, {
+          state: (payload as Record<string, string | number | null | undefined>).state ?? null
+        }) || null;
       if (!normalizedStatus) {
         res.status(400).json({ error: "Unsupported status" });
         return;
       }
 
       const payment = await paymentService.handleCryptoWebhook({
-        paymentId: payload.paymentId ?? (payload as Record<string, string>).order_id,
+        paymentId:
+          payload.paymentId ??
+          (payload as Record<string, string | undefined>).order_id ??
+          (payload as Record<string, string | undefined>).orderId,
         providerPaymentId:
           payload.providerPaymentId ??
-          (payload as Record<string, string | number | undefined>).payment_id?.toString(),
+          toOptionalString((payload as Record<string, unknown>).payment_id) ??
+          toOptionalString((payload as Record<string, unknown>).uuid) ??
+          toOptionalString((payload as Record<string, unknown>).payment_uuid),
         status: normalizedStatus,
         txHash:
           payload.txHash ??
           (payload as Record<string, string>).txHash ??
           (payload as Record<string, string>).tx_hash ??
-          (payload as Record<string, string>).payin_hash
+          (payload as Record<string, string>).payin_hash ??
+          toOptionalString((payload as Record<string, unknown>).txid) ??
+          toOptionalString((payload as Record<string, unknown>).transaction_hash) ??
+          toOptionalString((payload as Record<string, unknown>).hash)
       });
       res.json(payment.toJSON());
     } catch (error: any) {

@@ -109,6 +109,7 @@ const DepositModal: React.FC<Props> = ({
   const statusLabel = statusText[status] ?? "Waiting for payment";
 
   const instructions = deposit?.instructions;
+  const hasAddress = Boolean(instructions?.address);
 
   const content = (
     <div className="modal" role="dialog" aria-modal="true">
@@ -169,12 +170,21 @@ const DepositModal: React.FC<Props> = ({
         {deposit && instructions && (
           <div className="deposit-instructions">
             <div className="instruction-grid">
-              <div className="instruction-card">
-                <p className="eyebrow">Send to</p>
-                <div className="mono">{instructions.address}</div>
-                <small className="muted">{instructions.network || "USDT network"}</small>
-              </div>
-              {instructions.memo && (
+              {hasAddress && (
+                <div className="instruction-card">
+                  <p className="eyebrow">Send to</p>
+                  <div className="mono">{instructions.address}</div>
+                  <small className="muted">{instructions.network || "USDT network"}</small>
+                </div>
+              )}
+              {!hasAddress && instructions.checkoutUrl && (
+                <div className="instruction-card">
+                  <p className="eyebrow">Pay via hosted checkout</p>
+                  <div>Open the checkout page to get the address and memo for this payment.</div>
+                  <small className="muted">Cryptomus shows the final details inside the checkout flow.</small>
+                </div>
+              )}
+              {instructions.memo && hasAddress && (
                 <div className="instruction-card">
                   <p className="eyebrow">Memo / Reference</p>
                   <div className="mono">{instructions.memo}</div>

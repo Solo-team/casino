@@ -143,7 +143,7 @@ const bootstrap = async (): Promise<void> => {
             }: {
               req: express.Request;
               rawBody?: string | Buffer;
-              signature?: string;
+              signature?: string | string[];
             }) => gateway.verifySignature(rawBody, signature)
           : undefined
       };
@@ -164,19 +164,29 @@ const bootstrap = async (): Promise<void> => {
         network: process.env.CRYPTO_NETWORK ?? process.env.CRYPTOMUS_NETWORK,
         baseUrl: process.env.CRYPTOMUS_BASE_URL
       });
+      const expectedMerchant = merchantId.toLowerCase();
       return {
         gateway,
         providerName: "cryptomus",
         webhookSecret: process.env.CRYPTO_WEBHOOK_SECRET,
         signatureHeader: "sign",
         verifyWebhookSignature: ({
+          req,
           rawBody,
           signature
         }: {
           req: express.Request;
           rawBody?: string | Buffer;
-          signature?: string;
-        }) => gateway.verifySignature(rawBody, signature)
+          signature?: string | string[];
+        }) => {
+          const merchantHeader =
+            (req.headers.merchant as string | undefined) ||
+            (req.headers["x-merchant"] as string | undefined);
+          if (merchantHeader && merchantHeader.toLowerCase() !== expectedMerchant) {
+            return false;
+          }
+          return gateway.verifySignature(rawBody, signature);
+        }
       };
     };
 

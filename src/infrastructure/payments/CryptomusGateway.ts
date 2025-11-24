@@ -58,16 +58,28 @@ export class CryptomusGateway implements ICryptoPaymentGateway {
   }
 
   async createDeposit(request: CryptoDepositRequest): Promise<CryptoDepositResult> {
+    const amount = Number(request.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Cryptomus deposit amount must be positive");
+    }
+    const currency = request.currency.toUpperCase();
+
+    const toNumber = (value?: number | string | null): number | undefined => {
+      if (value === undefined || value === null) return undefined;
+      const parsed = typeof value === "string" ? Number(value) : value;
+      return Number.isFinite(parsed) ? Number(parsed) : undefined;
+    };
+
     const endpoint = `${this.baseUrl}/payment`;
     const payload = {
-      amount: request.amount,
-      currency: request.currency,
+      amount: amount.toString(),
+      currency,
       order_id: request.paymentId,
       network: this.network,
       url_return: this.returnUrl,
       url_success: this.successUrl,
       url_callback: this.callbackUrl,
-      description: request.description,
+      description: request.description ?? `Deposit for ${request.userName ?? request.userId}`,
       is_payment_multiple: false
     };
 
@@ -89,20 +101,30 @@ export class CryptomusGateway implements ICryptoPaymentGateway {
 
     const data = (await response.json()) as CryptomusCreateResponse;
     const result = data.result ?? {};
-    const providerPaymentId = result.uuid ?? request.paymentId;
+
+    if (!result.uuid) {
+      throw new Error("Cryptomus did not return a payment UUID");
+    }
+
+    if (!result.address && !result.url) {
+      throw new Error("Cryptomus response missing address and hosted checkout URL");
+    }
+
+    const providerPaymentId = result.uuid;
     const expiresAt = result.expired_at ? new Date(result.expired_at * 1000) : null;
-    const network = result.network ?? this.network;
+    const network = (result.network ?? this.network)?.toUpperCase();
+    const memo = result.tag ?? result.memo ?? undefined;
 
     return {
       providerPaymentId,
       address: result.address ?? "",
-      memo: result.tag ?? result.memo ?? undefined,
+      memo,
       network,
       checkoutUrl: result.url,
       expiresAt,
       metadata: {
-        payAmount: result.payment_amount ?? result.payer_amount,
-        currency: result.currency ?? request.currency,
+        payAmount: toNumber(result.payment_amount ?? result.payer_amount),
+        currency: (result.currency ?? currency).toUpperCase(),
         rawStatus: result.status,
         state: data.state
       }
