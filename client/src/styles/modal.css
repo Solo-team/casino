@@ -146,7 +146,31 @@
   justify-content: space-between;
   position: relative;
   z-index: 1;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
+}
+
+.game-header .eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 4px;
+}
+
+.game-header h2 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 0;
+  background: linear-gradient(135deg, #fff, rgba(255, 255, 255, 0.9));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.game-header .muted {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 4px;
 }
 
 .modal__content--wide h2 {
@@ -158,23 +182,31 @@
   position: relative;
   z-index: 1;
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
 }
 
 .meta-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 10px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .meta-chip.ghost {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.meta-chip strong {
+  font-weight: 700;
+  color: #fff;
 }
 
 .meta-chip .dot {
@@ -209,11 +241,13 @@
 .control-panel {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
-  padding: 16px;
-  background: linear-gradient(160deg, rgba(25, 30, 55, 0.9), rgba(20, 24, 43, 0.92));
+  padding: 20px;
+  background: linear-gradient(160deg, rgba(15, 20, 45, 0.95), rgba(10, 15, 35, 0.98));
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
 }
 
 .control-group {
@@ -327,10 +361,11 @@
 }
 
 .stake-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .stake-row {
@@ -1113,6 +1148,34 @@
   letter-spacing: 0.03em;
   color: #e9f4ff;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  transition: all 0.3s ease;
+}
+
+.symbol.winning {
+  animation: symbol-win 0.6s ease-out;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 193, 94, 0.2));
+  border-color: rgba(255, 215, 0, 0.6);
+  box-shadow: 
+    0 0 30px rgba(255, 215, 0, 0.6),
+    inset 0 0 20px rgba(255, 215, 0, 0.2);
+  transform: scale(1.1);
+}
+
+@keyframes symbol-win {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2) rotate(5deg);
+  }
+  100% {
+    transform: scale(1.1);
+  }
 }
 
 .slot-overlay {

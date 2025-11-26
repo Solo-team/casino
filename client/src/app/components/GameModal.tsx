@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import type { ApiGameResult } from "../../types/api";
 import type { GameContext } from "../types";
+import BlackjackPixi from "../game-engine/games/BlackjackPixi";
 
 interface Props {
   game: GameContext | null;
@@ -11,8 +12,8 @@ interface Props {
 }
 
 const INTERACTIVE_GAMES = ["neon-trails", "vault-heist"];
-
 const CASCADE_GAMES = ["aether-bonanza"];
+const BLACKJACK_ID = "blackjack";
 
 const LANE_OPTIONS: Array<{ value: "left" | "center" | "right"; label: string; helper: string }> = [
   { value: "left", label: "Glitch lane", helper: "Tighter turns, safer boosts" },
@@ -84,6 +85,8 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
 
   const isInteractive = INTERACTIVE_GAMES.includes(game.id);
   const isCascade = CASCADE_GAMES.includes(game.id);
+  const isBlackjack = game.id === BLACKJACK_ID;
+
   const cascadeData = isCascade
     ? (result?.gameData as {
         cascades?: Array<Record<string, unknown>>;
@@ -136,16 +139,29 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
     : 0;
   const cascadeScatterCount = isCascade ? (latestCascade?.scatterCount ?? 0) : 0;
 
+  const gameData = result?.gameData as Record<string, any> | undefined;
+  const bjStatus = isBlackjack ? (gameData?.status as string) : undefined;
+  const bjServerState = isBlackjack ? gameData?.serverState : undefined;
+
   const handlePlay = () => {
-    if (bet < game.minBet || bet > game.maxBet) {
-      return;
-    }
-    const gameData = isInteractive
+    if (bet < game.minBet || bet > game.maxBet) return;
+    const data = isInteractive
       ? { lane, volatility }
       : isCascade
         ? { mode: cascadeMode }
-        : undefined;
-    void onPlay(bet, gameData);
+        : isBlackjack
+          ? { action: "deal" }
+          : undefined;
+    void onPlay(bet, data);
+  };
+
+  const handleBlackjackAction = (action: "hit" | "stand" | "deal") => {
+    if (action === "deal") {
+      handlePlay();
+      return;
+    }
+    if (!bjServerState) return;
+    void onPlay(bet, { action, state: bjServerState });
   };
 
   const reelStrip = [...REEL_SYMBOLS, ...REEL_SYMBOLS.slice(0, 4)];
@@ -275,32 +291,48 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
   };
 
   const renderResultSummary = () => {
-    if (!result) {
+    if (!result && !bjStatus) {
       return <div className="slot-placeholder">Ready to make your move?</div>;
     }
-    const data = result.gameData ?? {};
+    const data = result?.gameData ?? {};
     const hasCascades = Array.isArray((data as { cascades?: unknown[] }).cascades);
     const isSlotsLike = hasCascades || Array.isArray((data as { segments?: unknown[] }).segments);
     const computedMultiplier =
       typeof (data as { finalMultiplier?: number }).finalMultiplier === "number"
         ? (data as { finalMultiplier: number }).finalMultiplier
-        : result.payout > 0
+        : result && result.payout > 0
           ? result.payout / result.betAmount
           : 0;
+
+    if (isBlackjack) {
+      if (bjStatus === "playing") return null;
+      return (
+        <div className="result-panel">
+          <div className="result-meta">
+            <span className={`pill ${result?.resultType.toLowerCase()}`}>{result?.resultType}</span>
+            <span className="pill">Bet {result?.betAmount}</span>
+            <span className="pill pill-accent">Payout {result?.payout}</span>
+          </div>
+          <div className="result-text">
+             <p>{result?.resultType === "WIN" ? "Blackjack victory!" : result?.resultType === "DRAW" ? "Push - bet returned." : "House wins."}</p>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="result-panel">
         <div className="result-meta">
-          <span className={`pill ${result.resultType.toLowerCase()}`}>{result.resultType}</span>
-          <span className="pill">Bet {result.betAmount}</span>
-          <span className="pill pill-accent">Payout {result.payout}</span>
+          <span className={`pill ${result?.resultType.toLowerCase()}`}>{result?.resultType}</span>
+          <span className="pill">Bet {result?.betAmount}</span>
+          <span className="pill pill-accent">Payout {result?.payout}</span>
           {computedMultiplier ? <span className="pill">x{computedMultiplier.toFixed(2)}</span> : null}
         </div>
         {hasCascades ? renderCascadeSummary(data) : null}
         {!hasCascades && isSlotsLike ? renderInteractiveTrack(data) : null}
-        {!isSlotsLike && (
+        {!isSlotsLike && !isBlackjack && (
           <div className="result-text">
-            <p>{result.resultType === "WIN" ? "You crushed it." : result.resultType === "DRAW" ? "Push." : "Try again."}</p>
+            <p>{result?.resultType === "WIN" ? "You crushed it." : result?.resultType === "DRAW" ? "Push." : "Try again."}</p>
             {Array.isArray((data as { playerHand?: unknown }).playerHand) && (
               <div className="muted">
                 <p>Player: {(data as { playerHand: string[] }).playerHand.join(", ")}</p>
@@ -344,18 +376,20 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
           </button>
         </header>
 
-        <div className="meta-ribbon">
-          <div className="meta-chip">
-            <span className="dot live" /> Live bonus pool
-            <strong> 1 250 000</strong>
+        {!isBlackjack && (
+          <div className="meta-ribbon">
+            <div className="meta-chip">
+              <span className="dot live" /> Live bonus pool
+              <strong> 1 250 000</strong>
+            </div>
+            <div className="meta-chip ghost">
+              {isCascade ? "Mode" : "Volatility"}: <strong>{isCascade ? cascadeMode : volatility}</strong>
+            </div>
+            <div className="meta-chip ghost">
+              {isCascade ? "Lanterns" : "Lane"}: <strong>{isCascade ? `${cascadeScatterCount}/4` : lane}</strong>
+            </div>
           </div>
-          <div className="meta-chip ghost">
-            {isCascade ? "Mode" : "Volatility"}: <strong>{isCascade ? cascadeMode : volatility}</strong>
-          </div>
-          <div className="meta-chip ghost">
-            {isCascade ? "Lanterns" : "Lane"}: <strong>{isCascade ? `${cascadeScatterCount}/4` : lane}</strong>
-          </div>
-        </div>
+        )}
 
         <div className="game-grid">
           <section className="control-panel">
@@ -435,7 +469,7 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
                 </div>
               </div>
             )}
-            {!isInteractive && !isCascade && (
+            {!isInteractive && !isCascade && !isBlackjack && (
               <div className="control-group">
                 <p className="muted">Classic table flow. Place your stake and play.</p>
               </div>
@@ -450,9 +484,10 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
                   max={game.maxBet}
                   value={bet}
                   onChange={event => setBet(Number(event.target.value))}
+                  disabled={isPlaying || bjStatus === "playing"}
                 />
-                <button className="button button-primary play-btn" onClick={handlePlay} disabled={isPlaying}>
-                  {isPlaying ? "Spinning..." : "Play"}
+                <button className="button button-primary play-btn" onClick={handlePlay} disabled={isPlaying || bjStatus === "playing"}>
+                  {isPlaying ? "Playing..." : "Deal"}
                 </button>
               </div>
               <p className="muted">Min {game.minBet} / Max {game.maxBet}</p>
@@ -461,11 +496,6 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
 
           <section className={`slot-stage ${isPlaying ? "spinning" : ""} ${result ? result.resultType.toLowerCase() : ""}`}>
             <div className="grid-overlay" />
-            <div className="particles">
-              {Array.from({ length: 12 }).map((_, idx) => (
-                <span key={idx} style={{ animationDelay: `${idx * 0.12}s` }} />
-              ))}
-            </div>
             {isInteractive ? (
               <div className="olympus-shell">
                 <div className="olympus-bg" />
@@ -583,6 +613,13 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
                   </div>
                 </div>
               </div>
+            ) : isBlackjack ? (
+              <BlackjackPixi
+                result={result}
+                isPlaying={isPlaying}
+                onAction={handleBlackjackAction}
+                bet={bet}
+              />
             ) : (
               <>
                 <div className="jackpot-marquee">
@@ -631,12 +668,12 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
                     ))}
                   </div>
                   <div className="slot-overlay">
-                    {result ? (
+                    {result && !isBlackjack ? (
                       <div className={`result-badge ${result.resultType.toLowerCase()}`}>
                         {result.resultType} {result.payout ? `+${result.payout}` : ""}
                       </div>
                     ) : (
-                      <div className="result-badge waiting">Ready to make your move?</div>
+                      !isBlackjack && <div className="result-badge waiting">Ready to make your move?</div>
                     )}
                     {bonusReady && <div className="burst" />}
                   </div>
@@ -644,7 +681,7 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
                 {renderResultSummary()}
               </>
             )}
-            {isInteractive || isCascade ? renderResultSummary() : null}
+            {isInteractive || isCascade || isBlackjack ? renderResultSummary() : null}
           </section>
         </div>
       </div>
@@ -653,6 +690,3 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay }
 };
 
 export default GameModal;
-
-
-

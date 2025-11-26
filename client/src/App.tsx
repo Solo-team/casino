@@ -8,6 +8,7 @@ import Toast from "./app/components/Toast";
 import AuthModal from "./app/components/AuthModal";
 import PersonalAccount from "./app/components/PersonalAccount";
 import DepositModal from "./app/components/DepositModal";
+import GamesGrid from "./app/components/GamesGrid";
 import { useCasino } from "./app/hooks/useCasino";
 import { useToast } from "./app/hooks/useToast";
 
@@ -88,12 +89,10 @@ const App: React.FC = () => {
               <SidebarNav />
               <section className="lobby-main">
                 <HeroCarousel />
-                <section className="section-panel">
-                  <h3>Content coming soon</h3>
-                  <p className="muted">
-                    Providers and games will be added later by another teammate. For now, explore other sections or stay tuned.
-                  </p>
-                </section>
+                <GamesGrid
+                  games={casino.games}
+                  onSelect={casino.openGame}
+                />
               </section>
               <PromoAside />
             </div>
@@ -114,6 +113,7 @@ const App: React.FC = () => {
               handleAuthError(error, "Unable to play");
             }
           }}
+          userBalance={casino.user?.balance ?? 0}
         />
       )}
       <DepositModal
