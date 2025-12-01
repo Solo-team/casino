@@ -46,6 +46,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get("token");
+    const error = urlParams.get("error");
     if (token) {
       setToken(token);
       // refresh user data
@@ -58,6 +59,13 @@ const App: React.FC = () => {
           console.error("Failed to refresh after Google sign-in", err);
         }
       })();
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (error) {
+      try {
+        showToast(decodeURIComponent(error), "error");
+      } catch {
+        showToast(error, "error");
+      }
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [casino, showToast]);

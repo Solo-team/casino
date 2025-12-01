@@ -36,6 +36,15 @@ export class CasinoService {
       throw new Error("User with this name already exists");
     }
 
+    // If user provided an email as the 'name' (UI accepts nickname or email), treat it as email
+    const isEmail = /@/.test(normalizedName);
+    if (isEmail) {
+      const existingByEmail = await this.userRepository.findByEmail(normalizedName);
+      if (existingByEmail) {
+        throw new Error(`Email ${normalizedName} is already registered. Sign in using ${existingByEmail.provider === 'local' ? 'password' : existingByEmail.provider}.`);
+      }
+    }
+
     const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
     const user = new User(
       this.generateId(),
@@ -43,7 +52,7 @@ export class CasinoService {
       initialBalance,
       passwordHash,
       new Date(),
-      null,
+      isEmail ? normalizedName : null,
       'local',
       null
     );
@@ -67,9 +76,15 @@ export class CasinoService {
     // Check if user exists with this email
     user = await this.userRepository.findByEmail(email);
     if (user) {
-      // User exists with this email but different auth method
-      // For security, we could either link accounts or throw error
-      // Here we'll return existing user (implicit account linking)
+      // If a user exists with this email but a different auth provider, reject
+      if (user.provider !== provider) {
+        const existingProvider = user.provider === 'local' ? 'password' : user.provider;
+        throw new Error(
+          `Email ${email} is already registered with ${existingProvider}. Sign in using ${existingProvider}.`
+        );
+      }
+
+      // If provider matches but providerId differs, return existing user
       return user;
     }
 
@@ -101,10 +116,20 @@ export class CasinoService {
 
   async authenticateUser(name: string, password: string): Promise<User> {
     const normalizedName = this.normalizeName(name);
-    const user = await this.userRepository.findByName(normalizedName);
+    // Try finding by name first
+    let user = await this.userRepository.findByName(normalizedName);
+    // If not found and input looks like an email, try lookup by email
+    if (!user && /@/.test(normalizedName)) {
+      user = await this.userRepository.findByEmail(normalizedName);
+    }
 
     if (!user) {
       throw new Error("Invalid credentials");
+    }
+
+    // If account is OAuth-only, disallow password login
+    if (user.provider !== 'local') {
+      throw new Error(`This account is registered with ${user.provider}. Please sign in using ${user.provider}.`);
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);

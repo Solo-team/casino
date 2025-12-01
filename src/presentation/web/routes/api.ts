@@ -150,7 +150,10 @@ export function createApiRouter(casinoService: CasinoService): Router {
       res.redirect(redirectTo);
     } catch (error: any) {
       console.error('Error in Google callback:', error);
-      res.status(500).send('Google auth failed');
+      const clientOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+      const message = error && error.message ? encodeURIComponent(error.message) : 'Google auth failed';
+      // Redirect back to client with error message so UI can show it
+      res.redirect(`${clientOrigin}?error=${message}`);
     }
   });
 

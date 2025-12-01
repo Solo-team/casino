@@ -16,12 +16,20 @@ async function runMigration() {
     await client.connect();
     console.log("Connected to database");
 
-    const migrationPath = path.join(__dirname, "migrations/001_add_oauth_fields.sql");
-    const sql = fs.readFileSync(migrationPath, "utf8");
+    const migrationsDir = path.join(__dirname, "migrations");
+    const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
 
-    console.log("Running migration...");
-    await client.query(sql);
-    console.log("Migration completed successfully!");
+    for (const file of files) {
+      const migrationPath = path.join(migrationsDir, file);
+      console.log(`Running migration ${file}...`);
+      const sql = fs.readFileSync(migrationPath, "utf8");
+
+      // If the SQL contains CREATE INDEX CONCURRENTLY we should run it as-is.
+      await client.query(sql);
+      console.log(`Migration ${file} applied.`);
+    }
+
+    console.log("All migrations completed successfully!");
   } catch (error) {
     console.error("Migration failed:", error);
     process.exit(1);
