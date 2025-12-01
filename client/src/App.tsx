@@ -11,6 +11,7 @@ import DepositModal from "./app/components/DepositModal";
 import GamesGrid from "./app/components/GamesGrid";
 import { useCasino } from "./app/hooks/useCasino";
 import { useToast } from "./app/hooks/useToast";
+import { setToken } from "./app/services/api";
 
 const App: React.FC = () => {
   const casino = useCasino();
@@ -42,6 +43,25 @@ const App: React.FC = () => {
     }
   }, [casino.user, showToast, casino.refreshUser, casino.refreshHistory]);
 
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("token");
+    if (token) {
+      setToken(token);
+      // refresh user data
+      void (async () => {
+        try {
+          await casino.refreshUser();
+          await casino.refreshHistory();
+          showToast("Signed in with Google", "success");
+        } catch (err) {
+          console.error("Failed to refresh after Google sign-in", err);
+        }
+      })();
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [casino, showToast]);
+
   const handleAuthError = (error: unknown, fallback: string) => {
     showToast(error instanceof Error ? error.message : fallback, "error");
   };
@@ -65,6 +85,15 @@ const App: React.FC = () => {
             setShowAccount(false);
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
+          onLogout={async () => {
+            try {
+              await casino.logout();
+              showToast("Signed out", "success");
+              setShowAccount(false);
+            } catch (err) {
+              handleAuthError(err, "Logout failed");
+            }
+          }}
         />
         {showAccount ? (
           <div className="lobby-layout account-view">
@@ -79,6 +108,15 @@ const App: React.FC = () => {
               }}
               onOpenDeposit={() => setDepositOpen(true)}
               onRefreshHistory={casino.refreshHistory}
+              onLogout={async () => {
+                try {
+                  await casino.logout();
+                  showToast("Signed out", "success");
+                  setShowAccount(false);
+                } catch (err) {
+                  handleAuthError(err, "Logout failed");
+                }
+              }}
               isBusy={casino.isAuthBusy}
               isHistoryRefreshing={casino.isHistoryRefreshing}
             />
@@ -167,6 +205,32 @@ const App: React.FC = () => {
             setAuthModalOpen(false);
           } catch (error) {
             handleAuthError(error, "Registration error");
+            throw error;
+          }
+        }}
+        onGoogleAuth={async (payload) => {
+          try {
+            await casino.loginWithGoogle(payload);
+            showToast("Signed in with Google", "success");
+            setAuthModalOpen(false);
+          } catch (error) {
+            handleAuthError(error, "Google sign-in error");
+            throw error;
+          }
+        }}
+        onForgotPassword={async (email) => {
+          try {
+            return await casino.forgotPassword(email);
+          } catch (error) {
+            handleAuthError(error, "Forgot password error");
+            throw error;
+          }
+        }}
+        onResetPassword={async (token, password) => {
+          try {
+            await casino.resetPassword(token, password);
+          } catch (error) {
+            handleAuthError(error, "Reset password error");
             throw error;
           }
         }}

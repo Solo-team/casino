@@ -1,4 +1,4 @@
-import { User } from "../../domain/entities/User";
+import { User, AuthProvider } from "../../domain/entities/User";
 import { IUserRepository } from "../../domain/interfaces/IUserRepository";
 
 export class InMemoryUserRepository implements IUserRepository {
@@ -11,6 +11,33 @@ export class InMemoryUserRepository implements IUserRepository {
   async findByName(name: string): Promise<User | null> {
     for (const user of this.users.values()) {
       if (user.name === name) {
+        return user;
+      }
+    }
+    return null;
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    for (const user of this.users.values()) {
+      if (user.email === email) {
+        return user;
+      }
+    }
+    return null;
+  }
+
+  async findByProviderId(provider: AuthProvider, providerId: string): Promise<User | null> {
+    for (const user of this.users.values()) {
+      if (user.provider === provider && user.providerId === providerId) {
+        return user;
+      }
+    }
+    return null;
+  }
+
+  async findByResetToken(token: string): Promise<User | null> {
+    for (const user of this.users.values()) {
+      if (user.resetToken === token) {
         return user;
       }
     }

@@ -14,6 +14,7 @@ interface Props {
   onRegisterClick: () => void;
   onAccountClick: () => void;
   onLobbyClick?: () => void;
+  onLogout?: () => void;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -42,10 +43,11 @@ const ACCOUNT_ITEMS = ["My bets", "Deposit", "Responsible play", "Support"];
 
 const MOBILE_TABS = ["Explore", "Account"] as const;
 
-const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick, onAccountClick, onLobbyClick }) => {
+const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick, onAccountClick, onLobbyClick, onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<(typeof MOBILE_TABS)[number]>("Explore");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const handleNavClick = (item: NavItem) => {
     if (item.children) {
@@ -102,9 +104,25 @@ const MainNav: React.FC<Props> = ({ user, onSignInClick, onRegisterClick, onAcco
               Sign in
             </button>
           ) : (
-            <button className="button button-primary" type="button" onClick={onAccountClick}>
-              My account
-            </button>
+            <div className="account-menu">
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={() => setAccountMenuOpen(prev => !prev)}
+              >
+                My account
+              </button>
+              {accountMenuOpen && (
+                <div className="account-menu__dropdown">
+                  <button type="button" onClick={() => { setAccountMenuOpen(false); onAccountClick(); }}>
+                    View account
+                  </button>
+                  <button type="button" onClick={() => { setAccountMenuOpen(false); onLogout && onLogout(); }}>
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -99,6 +99,33 @@ export const ApiService = {
       body: JSON.stringify(payload),
       requireAuth: false
     }),
+  googleAuth: (payload: { email: string; name: string; googleId: string }) =>
+    request<AuthResponse>(`/auth/google`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      requireAuth: false
+    }),
+  logout: () =>
+    request<{ message: string }>(`/auth/logout`, {
+      method: "POST"
+    }),
+  forgotPassword: (email: string) =>
+    request<{ message: string; resetToken?: string }>(`/auth/forgot-password`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      requireAuth: false
+    }),
+  resetPassword: (token: string, password: string) =>
+    request<{ message: string }>(`/auth/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+      requireAuth: false
+    }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ message: string }>(`/auth/change-password`, {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword })
+    }),
   deposit: (amount: number) =>
     request<ApiUser>(`/users/deposit`, {
       method: "POST",

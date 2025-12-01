@@ -1,4 +1,6 @@
-﻿import { Column, CreateDateColumn, Entity, PrimaryColumn } from "typeorm";
+﻿import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from "typeorm";
+
+export type AuthProvider = 'local' | 'google';
 
 const toNumeric = (value?: number | string | null): number => {
   if (value === null || value === undefined) {
@@ -18,8 +20,22 @@ export class UserOrmEntity {
   @Column({ type: "varchar", length: 255, unique: true })
   name!: string;
 
-  @Column({ name: "password_hash", type: "varchar", length: 255 })
-  passwordHash!: string;
+  @Column({ type: "varchar", length: 255, unique: true, nullable: true })
+  email!: string | null;
+
+  @Column({ name: "password_hash", type: "varchar", length: 255, nullable: true })
+  passwordHash!: string | null;
+
+  @Column({
+    type: "varchar",
+    length: 20,
+    default: 'local'
+  })
+  provider!: AuthProvider;
+
+  @Column({ name: "provider_id", type: "varchar", length: 255, nullable: true })
+  @Index()
+  providerId!: string | null;
 
   @Column({
     type: "numeric",
@@ -32,6 +48,12 @@ export class UserOrmEntity {
     }
   })
   balance!: number;
+
+  @Column({ name: "reset_token", type: "varchar", length: 255, nullable: true })
+  resetToken!: string | null;
+
+  @Column({ name: "reset_token_expiry", type: "timestamptz", nullable: true })
+  resetTokenExpiry!: Date | null;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;

@@ -126,6 +126,45 @@
   gap: 12px;
 }
 
+/* Account menu dropdown styling */
+.account-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.account-menu__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 160px;
+  background: linear-gradient(165deg, rgba(7, 10, 26, 0.98), rgba(10, 14, 34, 0.96));
+  border-radius: 10px;
+  border: 1px solid rgba(124, 242, 255, 0.12);
+  padding: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 50;
+}
+
+.account-menu__dropdown button {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.account-menu__dropdown button:hover {
+  background: rgba(255,255,255,0.03);
+  color: var(--accent);
+}
+
 .nav-toggle {
   display: none;
   background: transparent;

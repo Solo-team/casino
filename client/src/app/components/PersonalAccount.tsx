@@ -10,6 +10,7 @@ interface Props {
   onRegister: (name: string, password: string, balance: number) => Promise<void>;
   onOpenDeposit: () => void;
   onRefreshHistory: () => Promise<void>;
+  onLogout?: () => void;
   isBusy: boolean;
   isHistoryRefreshing: boolean;
 }
@@ -21,6 +22,7 @@ const PersonalAccount: React.FC<Props> = ({
   onRegister,
   onOpenDeposit,
   onRefreshHistory,
+  onLogout,
   isBusy,
   isHistoryRefreshing
 }) => {
@@ -101,7 +103,13 @@ const PersonalAccount: React.FC<Props> = ({
           <div className="account-hero__content">
             <p className="eyebrow">Personal account</p>
             <h2>{user.name}</h2>
+            {user.email && (
+              <p className="muted">{user.email}</p>
+            )}
             <p className="muted">Member since {formatDate(user.createdAt)}</p>
+            {user.provider && user.provider !== "local" && (
+              <div className="account-provider-badge">Signed in with {user.provider}</div>
+            )}
             <div className="account-meta">Rounds • {totalGames || 0}</div>
           </div>
           <div className="account-hero__balance">
@@ -119,6 +127,17 @@ const PersonalAccount: React.FC<Props> = ({
               onClick={onOpenDeposit}
             >
               Add funds
+            </button>
+            <button
+              className="button button-secondary account-cta"
+              type="button"
+              onClick={() => {
+                console.debug("PersonalAccount: Sign out clicked", { hasHandler: !!onLogout });
+                onLogout && onLogout();
+              }}
+              style={{ marginLeft: 8 }}
+            >
+              Sign out
             </button>
             <small className="muted">Instant deposits with no extra fees.</small>
           </div>

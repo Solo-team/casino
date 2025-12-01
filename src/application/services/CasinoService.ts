@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
-import { User } from "../../domain/entities/User";
+import { User, AuthProvider } from "../../domain/entities/User";
 import { GameResult } from "../../domain/entities/GameResult";
 import { IUserRepository } from "../../domain/interfaces/IUserRepository";
 import { IGameResultRepository } from "../../domain/interfaces/IGameResultRepository";
@@ -13,6 +13,8 @@ import { TypeOrmGameResultRepository } from "../../infrastructure/repositories/T
 const PASSWORD_SALT_ROUNDS = process.env.PASSWORD_SALT_ROUNDS 
   ? parseInt(process.env.PASSWORD_SALT_ROUNDS, 10) 
   : 10;
+
+const RESET_TOKEN_EXPIRY_HOURS = 1;
 
 export class CasinoService {
   constructor(
@@ -39,10 +41,62 @@ export class CasinoService {
       this.generateId(),
       normalizedName,
       initialBalance,
-      passwordHash
+      passwordHash,
+      new Date(),
+      null,
+      'local',
+      null
     );
     await this.userRepository.save(user);
     return user;
+  }
+
+  async registerOrLoginWithOAuth(
+    provider: AuthProvider,
+    providerId: string,
+    email: string,
+    name: string,
+    initialBalance: number = 1000
+  ): Promise<User> {
+    // Check if user already exists with this OAuth provider
+    let user = await this.userRepository.findByProviderId(provider, providerId);
+    if (user) {
+      return user;
+    }
+
+    // Check if user exists with this email
+    user = await this.userRepository.findByEmail(email);
+    if (user) {
+      // User exists with this email but different auth method
+      // For security, we could either link accounts or throw error
+      // Here we'll return existing user (implicit account linking)
+      return user;
+    }
+
+    // Create new user
+    const normalizedName = await this.generateUniqueName(name || email.split('@')[0]);
+    const newUser = new User(
+      this.generateId(),
+      normalizedName,
+      initialBalance,
+      '', // No password for OAuth users
+      new Date(),
+      email,
+      provider,
+      providerId
+    );
+    await this.userRepository.save(newUser);
+    return newUser;
+  }
+
+  private async generateUniqueName(baseName: string): Promise<string> {
+    let name = baseName;
+    let counter = 1;
+    while (await this.userRepository.findByName(name)) {
+      name = `${baseName}${counter}`;
+      counter++;
+    }
+    return name;
   }
 
   async authenticateUser(name: string, password: string): Promise<User> {
@@ -71,6 +125,66 @@ export class CasinoService {
 
   async getUserByName(name: string): Promise<User | null> {
     return this.userRepository.findByName(this.normalizeName(name));
+  }
+
+  async getUserByEmail(email: string): Promise<User | null> {
+    return this.userRepository.findByEmail(email);
+  }
+
+  async createPasswordResetToken(email: string): Promise<string | null> {
+    const user = await this.userRepository.findByEmail(email);
+    if (!user) {
+      // Don't reveal if email exists or not
+      return null;
+    }
+
+    if (user.provider !== 'local') {
+      throw new Error("Cannot reset password for OAuth accounts. Please sign in with " + user.provider);
+    }
+
+    const resetToken = randomUUID();
+    const expiry = new Date(Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+    
+    user.setResetToken(resetToken, expiry);
+    await this.userRepository.save(user);
+    
+    return resetToken;
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    this.ensurePasswordStrength(newPassword);
+
+    const user = await this.userRepository.findByResetToken(token);
+    if (!user) {
+      throw new Error("Invalid or expired reset token");
+    }
+
+    if (!user.isResetTokenValid(token)) {
+      throw new Error("Invalid or expired reset token");
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, PASSWORD_SALT_ROUNDS);
+    user.updatePasswordHash(passwordHash);
+    user.clearResetToken();
+    await this.userRepository.save(user);
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.getUser(userId);
+    
+    if (user.provider !== 'local') {
+      throw new Error("Cannot change password for OAuth accounts");
+    }
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      throw new Error("Current password is incorrect");
+    }
+
+    this.ensurePasswordStrength(newPassword);
+    const passwordHash = await bcrypt.hash(newPassword, PASSWORD_SALT_ROUNDS);
+    user.updatePasswordHash(passwordHash);
+    await this.userRepository.save(user);
   }
 
   async deposit(userId: string, amount: number): Promise<User> {

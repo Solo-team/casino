@@ -1,11 +1,22 @@
 import { EntityManager, Repository } from "typeorm";
-import { User } from "../../domain/entities/User";
+import { User, AuthProvider } from "../../domain/entities/User";
 import { IUserRepository } from "../../domain/interfaces/IUserRepository";
 import { AppDataSource } from "../database/data-source";
 import { UserOrmEntity } from "../database/entities/UserOrmEntity";
 
 const toDomain = (entity: UserOrmEntity): User =>
-  new User(entity.id, entity.name, entity.balance, entity.passwordHash, entity.createdAt);
+  new User(
+    entity.id,
+    entity.name,
+    entity.balance,
+    entity.passwordHash || '',
+    entity.createdAt,
+    entity.email,
+    entity.provider as AuthProvider,
+    entity.providerId,
+    entity.resetToken,
+    entity.resetTokenExpiry
+  );
 
 export class TypeOrmUserRepository implements IUserRepository {
   private readonly repository: Repository<UserOrmEntity>;
@@ -27,12 +38,32 @@ export class TypeOrmUserRepository implements IUserRepository {
     return entity ? toDomain(entity) : null;
   }
 
+  async findByEmail(email: string): Promise<User | null> {
+    const entity = await this.repository.findOne({ where: { email } });
+    return entity ? toDomain(entity) : null;
+  }
+
+  async findByProviderId(provider: AuthProvider, providerId: string): Promise<User | null> {
+    const entity = await this.repository.findOne({ where: { provider, providerId } });
+    return entity ? toDomain(entity) : null;
+  }
+
+  async findByResetToken(token: string): Promise<User | null> {
+    const entity = await this.repository.findOne({ where: { resetToken: token } });
+    return entity ? toDomain(entity) : null;
+  }
+
   async save(user: User): Promise<void> {
     await this.repository.save({
       id: user.id,
       name: user.name,
-      passwordHash: user.passwordHash,
+      email: user.email,
+      passwordHash: user.passwordHash || null,
+      provider: user.provider,
+      providerId: user.providerId,
       balance: user.balance,
+      resetToken: user.resetToken,
+      resetTokenExpiry: user.resetTokenExpiry,
       createdAt: user.createdAt
     });
   }
@@ -42,8 +73,13 @@ export class TypeOrmUserRepository implements IUserRepository {
     await repo.save({
       id: user.id,
       name: user.name,
-      passwordHash: user.passwordHash,
+      email: user.email,
+      passwordHash: user.passwordHash || null,
+      provider: user.provider,
+      providerId: user.providerId,
       balance: user.balance,
+      resetToken: user.resetToken,
+      resetTokenExpiry: user.resetTokenExpiry,
       createdAt: user.createdAt
     });
   }

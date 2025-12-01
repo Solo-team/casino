@@ -169,6 +169,46 @@ export function useCasino() {
     [loadInitialData, persistUser, runAuthAction]
   );
 
+  const loginWithGoogle = useCallback(
+    async (payload: { email: string; name: string; googleId: string }) => {
+      await runAuthAction(async () => {
+        const response = await ApiService.googleAuth(payload);
+        setToken(response.token);
+        persistUser(response.user);
+        await loadInitialData();
+      });
+    },
+    [loadInitialData, persistUser, runAuthAction]
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await ApiService.logout();
+    } catch (error) {
+      console.error("Logout API call failed:", error);
+    } finally {
+      setToken(null);
+      persistUser(null);
+      setHistory([]);
+      setLastPayment(null);
+      setCurrentGame(null);
+      setLastGameResult(null);
+    }
+  }, [persistUser]);
+
+  const forgotPassword = useCallback(async (email: string) => {
+    const response = await ApiService.forgotPassword(email);
+    return response;
+  }, []);
+
+  const resetPassword = useCallback(async (token: string, password: string) => {
+    await ApiService.resetPassword(token, password);
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    await ApiService.changePassword(currentPassword, newPassword);
+  }, []);
+
   const deposit = useCallback(
     async (amount: number) => {
       if (!user) return;
@@ -265,18 +305,6 @@ export function useCasino() {
     [currentGame, persistUser, refreshHistory, user]
   );
 
-  const logout = useCallback(() => {
-    setToken(null);
-    persistUser(null);
-    setGames([]);
-    setProviders([]);
-    setSlots([]);
-    setHistory([]);
-    setCurrentGame(null);
-    setLastGameResult(null);
-    setSelectedProvider(null);
-  }, [persistUser]);
-
   const state = useMemo(
     () => ({
       user,
@@ -314,9 +342,13 @@ export function useCasino() {
     ...state,
     login,
     register,
+    loginWithGoogle,
+    logout,
+    forgotPassword,
+    resetPassword,
+    changePassword,
     deposit,
     refreshUser,
-    logout,
     selectProvider,
     openGame,
     closeGame,

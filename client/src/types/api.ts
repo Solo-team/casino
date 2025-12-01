@@ -2,12 +2,15 @@ export type GameResultType = "WIN" | "LOSS" | "DRAW";
 export type PaymentStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "EXPIRED";
 export type PaymentMethod = "CRYPTO" | "PAYPAL";
 export type DepositMethod = "cryptomus" | "paypal";
+export type AuthProvider = "local" | "google";
 
 export interface ApiUser {
   id: string;
   name: string;
   balance: number;
   createdAt: string;
+  email?: string | null;
+  provider: AuthProvider;
 }
 
 export interface ApiGame {
