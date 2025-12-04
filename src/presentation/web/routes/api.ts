@@ -84,13 +84,18 @@ export function createApiRouter(casinoService: CasinoService): Router {
   // Server-side OAuth: initiate Google OAuth flow (redirect)
   router.get("/auth/google", async (req: Request, res: Response) => {
     try {
-      const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
+      const clientId = process.env.GOOGLE_CLIENT_ID;
       const redirectUri = `${process.env.PORT ? `http://localhost:${process.env.PORT}` : `http://localhost:3000`}/api/auth/google/callback`;
       const scope = encodeURIComponent("openid email profile");
       const state = encodeURIComponent(req.query.state as string || "");
 
       if (!clientId) {
-        res.status(500).json({ error: "Google client ID not configured" });
+        console.error("GOOGLE_CLIENT_ID is not set in environment variables");
+        console.error("Available env vars:", Object.keys(process.env).filter(k => k.includes("GOOGLE")).join(", ") || "none");
+        res.status(500).json({ 
+          error: "Google client ID not configured",
+          hint: "Please set GOOGLE_CLIENT_ID in your .env file"
+        });
         return;
       }
 
@@ -111,12 +116,19 @@ export function createApiRouter(casinoService: CasinoService): Router {
         return;
       }
 
-      const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
+      const clientId = process.env.GOOGLE_CLIENT_ID;
       const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
       const redirectUri = `${process.env.PORT ? `http://localhost:${process.env.PORT}` : `http://localhost:3000`}/api/auth/google/callback`;
 
       if (!clientId || !clientSecret) {
-        res.status(500).send("Google OAuth not configured on server");
+        console.error("Google OAuth not configured:", {
+          hasClientId: !!clientId,
+          hasClientSecret: !!clientSecret
+        });
+        res.status(500).json({ 
+          error: "Google OAuth not configured on server",
+          hint: "Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env file"
+        });
         return;
       }
 
@@ -359,14 +371,41 @@ export function createApiRouter(casinoService: CasinoService): Router {
   router.get("/games", async (_req: Request, res: Response) => {
     try {
       const games = casinoService.getAvailableGames();
-      res.json(games.map(game => ({
-        id: game.id,
-        name: game.name,
-        minBet: game.getMinBet(),
-        maxBet: game.getMaxBet(),
-        metadata: typeof game.getSummary === "function" ? game.getSummary() : null
-      })));
+      const result = games.map(game => {
+        try {
+          let metadata = null;
+          if (typeof game.getSummary === "function") {
+            try {
+              const summary = game.getSummary();
+              metadata = JSON.parse(JSON.stringify(summary));
+            } catch (summaryError: any) {
+              console.error(`Error serializing summary for game ${game.id}:`, summaryError);
+              metadata = null;
+            }
+          }
+          return {
+            id: game.id,
+            name: game.name,
+            minBet: game.getMinBet(),
+            maxBet: game.getMaxBet(),
+            metadata
+          };
+        } catch (gameError: any) {
+          console.error(`Error processing game ${game.id}:`, gameError);
+          return {
+            id: game.id,
+            name: game.name,
+            minBet: 0,
+            maxBet: 0,
+            metadata: null,
+            error: gameError.message
+          };
+        }
+      });
+      res.json(result);
     } catch (error: any) {
+      console.error("Error in /api/games:", error);
+      console.error("Error stack:", error.stack);
       res.status(500).json({ error: error.message });
     }
   });
@@ -374,13 +413,31 @@ export function createApiRouter(casinoService: CasinoService): Router {
   router.get("/providers", async (_req: Request, res: Response) => {
     try {
       const providers = casinoService.getSlotProviders();
-      res.json(providers.map(p => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        gamesCount: p.getGames().length
-      })));
+      const result = providers.map(p => {
+        try {
+          const games = p.getGames();
+          return {
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            gamesCount: games ? games.length : 0
+          };
+        } catch (providerError: any) {
+          console.error(`Error processing provider ${p.id}:`, providerError);
+          console.error("Provider error stack:", providerError.stack);
+          return {
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            gamesCount: 0,
+            error: providerError.message
+          };
+        }
+      });
+      res.json(result);
     } catch (error: any) {
+      console.error("Error in /api/providers:", error);
+      console.error("Error stack:", error.stack);
       res.status(500).json({ error: error.message });
     }
   });
