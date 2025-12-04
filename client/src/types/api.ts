@@ -19,6 +19,35 @@ export interface ApiGame {
   minBet: number;
   maxBet: number;
   description?: string;
+  metadata?: NftGameMetadata | null;
+}
+
+export type NftRarity = "common" | "rare" | "legendary";
+
+export interface NftSymbolSummary {
+  id: string;
+  name: string;
+  imageUrl: string;
+  priceLabel: string;
+  priceValue: number;
+  rarity: NftRarity;
+}
+
+export interface NftGameMetadata {
+  id: string;
+  name: string;
+  previewImage: string | null;
+  itemCount: number;
+  winChance: number;
+  priceStats: {
+    min: number;
+    max: number;
+    median: number;
+    average: number;
+  };
+  rarity: Record<NftRarity, number>;
+  sourcePath: string;
+  symbols: NftSymbolSummary[];
 }
 
 export interface ApiProvider {

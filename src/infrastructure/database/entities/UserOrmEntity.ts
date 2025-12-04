@@ -55,6 +55,18 @@ export class UserOrmEntity {
   @Column({ name: "reset_token_expiry", type: "timestamptz", nullable: true })
   resetTokenExpiry!: Date | null;
 
+  @Column({ name: "email_verified", type: "boolean", default: false })
+  emailVerified!: boolean;
+
+  @Column({ name: "email_verification_token", type: "varchar", length: 255, nullable: true })
+  emailVerificationToken!: string | null;
+
+  @Column({ name: "email_verification_expiry", type: "timestamptz", nullable: true })
+  emailVerificationExpiry!: Date | null;
+
+  @Column({ name: "is_admin", type: "boolean", default: false })
+  isAdmin!: boolean;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 }

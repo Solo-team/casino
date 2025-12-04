@@ -1,5 +1,8 @@
 export type AuthProvider = 'local' | 'google';
 
+// Админские email с бесконечным балансом
+const ADMIN_EMAILS = ['malavov70@gmail.com'];
+
 export class User {
   constructor(
     public readonly id: string,
@@ -11,7 +14,11 @@ export class User {
     public readonly provider: AuthProvider = 'local',
     public readonly providerId: string | null = null,
     private _resetToken: string | null = null,
-    private _resetTokenExpiry: Date | null = null
+    private _resetTokenExpiry: Date | null = null,
+    private _emailVerified: boolean = false,
+    private _emailVerificationToken: string | null = null,
+    private _emailVerificationExpiry: Date | null = null,
+    private _isAdmin: boolean = false
   ) {
     if (_balance < 0) {
       throw new Error("Balance cannot be negative");
@@ -19,10 +26,22 @@ export class User {
     if (provider === 'local' && !_passwordHash) {
       throw new Error("Password hash is required for local auth");
     }
+    // Автоматически делаем админом по email
+    if (email && ADMIN_EMAILS.includes(email.toLowerCase())) {
+      this._isAdmin = true;
+    }
   }
 
   get balance(): number {
+    // Админы имеют бесконечный баланс
+    if (this._isAdmin) {
+      return 999999999;
+    }
     return this._balance;
+  }
+
+  get isAdmin(): boolean {
+    return this._isAdmin;
   }
 
   get passwordHash(): string {
@@ -35,6 +54,30 @@ export class User {
 
   get resetTokenExpiry(): Date | null {
     return this._resetTokenExpiry;
+  }
+
+  get emailVerified(): boolean {
+    return this._emailVerified;
+  }
+
+  get emailVerificationToken(): string | null {
+    return this._emailVerificationToken;
+  }
+
+  get emailVerificationExpiry(): Date | null {
+    return this._emailVerificationExpiry;
+  }
+
+  setEmailVerification(token: string, expiry: Date) {
+    this._emailVerificationToken = token;
+    this._emailVerificationExpiry = expiry;
+    this._emailVerified = false;
+  }
+
+  verifyEmail() {
+    this._emailVerified = true;
+    this._emailVerificationToken = null;
+    this._emailVerificationExpiry = null;
   }
 
   updatePasswordHash(nextHash: string): void {
@@ -71,6 +114,10 @@ export class User {
     if (amount <= 0) {
       throw new Error("Withdraw amount must be positive");
     }
+    // Админы не теряют деньги
+    if (this._isAdmin) {
+      return;
+    }
     if (this._balance < amount) {
       throw new Error("Insufficient balance");
     }
@@ -78,17 +125,22 @@ export class User {
   }
 
   canBet(amount: number): boolean {
+    // Админы всегда могут ставить
+    if (this._isAdmin) {
+      return amount > 0;
+    }
     return this._balance >= amount && amount > 0;
   }
 
-  toJSON(): { id: string; name: string; balance: number; createdAt: Date; email: string | null; provider: AuthProvider } {
+  toJSON(): { id: string; name: string; balance: number; createdAt: Date; email: string | null; provider: AuthProvider; isAdmin: boolean } {
     return {
       id: this.id,
       name: this.name,
       balance: this.balance,
       createdAt: this.createdAt,
       email: this.email,
-      provider: this.provider
+      provider: this.provider,
+      isAdmin: this._isAdmin
     };
   }
 }

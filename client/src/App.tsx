@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import GameModal from "./app/components/GameModal";
 import HeroCarousel from "./app/components/HeroCarousel";
 import MainNav from "./app/components/MainNav";
@@ -114,6 +114,15 @@ const App: React.FC = () => {
               onRegister={async (name, password, balance) => {
                 await casino.register(name, password, balance);
               }}
+              onGoogleAuth={async (payload) => {
+                await casino.loginWithGoogle(payload);
+              }}
+              onForgotPassword={async (email) => {
+                return await casino.forgotPassword(email);
+              }}
+              onResetPassword={async (token, password) => {
+                await casino.resetPassword(token, password);
+              }}
               onOpenDeposit={() => setDepositOpen(true)}
               onRefreshHistory={casino.refreshHistory}
               onLogout={async () => {
@@ -208,7 +217,13 @@ const App: React.FC = () => {
         }}
         onRegister={async ({ name, password, balance }) => {
           try {
-            await casino.register(name, password, balance ?? 1000);
+            const res = await casino.register(name, password, balance ?? 1000);
+            // If registration required email verification, backend returns { message, verificationToken? }
+            if (res && (res.verificationToken || res.message)) {
+              showToast(res.message || 'Verification email sent', 'success');
+              // keep modal open so user can enter code (UI not yet implemented)
+              return;
+            }
             showToast("Registration successful", "success");
             setAuthModalOpen(false);
           } catch (error) {

@@ -1,4 +1,4 @@
-import type { GameResultType } from "../types/api";
+import type { GameResultType, NftGameMetadata } from "../types/api";
 
 export type PanelId = "games" | "slots" | "history" | "wallet";
 
@@ -15,6 +15,7 @@ export interface GameContext {
   minBet: number;
   maxBet: number;
   providerName?: string;
+  metadata?: NftGameMetadata | null;
 }
 
 export interface GameResultView {

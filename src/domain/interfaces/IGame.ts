@@ -8,4 +8,5 @@ export interface IGame {
   validateBet(betAmount: number, userBalance: number): boolean;
   getMinBet(): number;
   getMaxBet(): number;
+  getSummary?(): Record<string, unknown>;
 }

@@ -88,7 +88,7 @@ export interface AuthResponse {
 export const ApiService = {
   getCurrentUser: () => request<ApiUser>(`/users/me`),
   registerUser: (payload: { name: string; password: string; initialBalance: number }) =>
-    request<AuthResponse>(`/auth/register`, {
+    request<any>(`/auth/register`, {
       method: "POST",
       body: JSON.stringify(payload),
       requireAuth: false

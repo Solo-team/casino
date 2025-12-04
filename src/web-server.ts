@@ -6,13 +6,7 @@ import path from "path";
 import { CasinoService } from "./application/services/CasinoService";
 import { PaymentService } from "./application/services/PaymentService";
 import { PaymentMethod } from "./domain/entities/PaymentTransaction";
-import { BlackjackGame } from "./domain/games/BlackjackGame";
-import { RouletteGame } from "./domain/games/RouletteGame";
-import { SlotMachineGame } from "./domain/games/SlotMachineGame";
-import { ProviderA } from "./domain/providers/ProviderA";
-import { ProviderB } from "./domain/providers/ProviderB";
-import { InteractiveProvider } from "./domain/providers/InteractiveProvider";
-import { MythicSlotsProvider } from "./domain/providers/MythicSlotsProvider";
+import { loadNftSlotGames } from "./domain/games/loadNftCollections";
 import { createApiRouter } from "./presentation/web/routes/api";
 import { createPaymentsRouter } from "./presentation/web/routes/payments";
 import { AppDataSource } from "./infrastructure/database/data-source";
@@ -86,24 +80,16 @@ const bootstrap = async (): Promise<void> => {
     const gameResultRepository = new TypeOrmGameResultRepository();
     const paymentRepository = new TypeOrmPaymentRepository();
 
-    const games = [
-      new BlackjackGame(),
-      new RouletteGame(),
-      new SlotMachineGame()
-    ];
-
-    const slotProviders = [
-      new MythicSlotsProvider(),
-      new InteractiveProvider(),
-      new ProviderA(),
-      new ProviderB()
-    ];
+    const games = await loadNftSlotGames();
+    if (!games.length) {
+      console.warn("No NFT slot games were loaded. Add nft_*.json files under the pyt directory.");
+    }
 
     const casinoService = new CasinoService(
       userRepository,
       gameResultRepository,
       games,
-      slotProviders
+      []
     );
 
     const devCryptoMode = process.env.CRYPTO_DEV_MODE === "true";

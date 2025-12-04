@@ -9,6 +9,12 @@ interface Slide {
 
 const SLIDES: Slide[] = [
   {
+    title: "Zews and Hides",
+    subtitle: "Zeus lightning collides with Hades flames for 5000x",
+    tag: "Mythic",
+    accent: "linear-gradient(120deg, #1a1636, #ffb347)"
+  },
+  {
     title: "Neon Protocol",
     subtitle: "Co-op heists in zero gravity with pulse boosts",
     tag: "New",

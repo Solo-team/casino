@@ -10,6 +10,17 @@ export function createApiRouter(casinoService: CasinoService): Router {
     try {
       const { name, password, initialBalance } = req.body;
       const user = await casinoService.registerUser(name, password, initialBalance || 1000);
+      // If user provided an email and verification is required, do not auto-issue JWT
+      if (user.email && (user as any).emailVerificationToken) {
+        const payload: any = { message: "Verification email sent" };
+        if (process.env.NODE_ENV === 'development') {
+          payload.verificationToken = (user as any).emailVerificationToken;
+        }
+        res.json(payload);
+        return;
+      }
+
+      // Otherwise, issue token immediately
       const token = generateToken({ userId: user.id, name: user.name });
       res.json({ user: user.toJSON(), token });
     } catch (error: any) {
@@ -21,12 +32,33 @@ export function createApiRouter(casinoService: CasinoService): Router {
   router.post("/users", registerHandler);
   router.post("/auth/register", registerHandler);
 
+  // Verify email
+  router.post('/auth/verify-email', async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        res.status(400).json({ error: 'Verification token is required' });
+        return;
+      }
+      const user = await casinoService.verifyEmail(token);
+      const jwt = generateToken({ userId: user.id, name: user.name });
+      res.json({ user: user.toJSON(), token: jwt });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || 'Verification failed' });
+    }
+  });
+
   router.post("/auth/login", async (req: Request, res: Response) => {
     try {
       const { name, password } = req.body;
       const user = await casinoService.authenticateUser(name, password);
       const token = generateToken({ userId: user.id, name: user.name });
-      res.json({ user: user.toJSON(), token });
+      const userData = user.toJSON();
+      // Хардкод баланса для админа
+      if (userData.email === 'malavov70@gmail.com' || userData.isAdmin) {
+        userData.balance = 999999999;
+      }
+      res.json({ user: userData, token });
     } catch (error: any) {
       res.status(401).json({ error: error.message });
     }
@@ -236,7 +268,14 @@ export function createApiRouter(casinoService: CasinoService): Router {
         return;
       }
       const user = await casinoService.getUser(req.userId);
-      res.json(user.toJSON());
+      const userData = user.toJSON();
+      
+      // Force admin balance
+      if (userData.email === 'malavov70@gmail.com' || userData.isAdmin) {
+        userData.balance = 999999999;
+      }
+      
+      res.json(userData);
     } catch (error: any) {
       res.status(404).json({ error: error.message });
     }
@@ -269,14 +308,63 @@ export function createApiRouter(casinoService: CasinoService): Router {
     }
   });
 
+  router.get("/nft/image", async (req: Request, res: Response) => {
+    const target = typeof req.query.url === "string" ? req.query.url.trim() : "";
+    if (!target) {
+      res.status(400).json({ error: "Missing url parameter" });
+      return;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(target);
+    } catch {
+      res.status(400).json({ error: "Invalid url" });
+      return;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    const allowedHosts = (process.env.NFT_IMAGE_HOSTS || "i.getgems.io,getgems.io").split(",").map(host => host.trim().toLowerCase()).filter(Boolean);
+    const isAllowed = allowedHosts.some(host => hostname === host || hostname.endsWith(`.${host}`));
+    if (!isAllowed) {
+      res.status(400).json({ error: "Host not allowed" });
+      return;
+    }
+
+    try {
+      const upstream = await fetch(parsed.toString(), {
+        headers: {
+          "User-Agent": "CasinoNFTProxy/1.0"
+        }
+      });
+
+      if (!upstream.ok) {
+        res.status(upstream.status).json({ error: `Upstream responded with ${upstream.status}` });
+        return;
+      }
+
+      const arrayBuffer = await upstream.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const contentType = upstream.headers.get("content-type") || "image/jpeg";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=900");
+      res.setHeader("Content-Length", buffer.length.toString());
+      res.send(buffer);
+    } catch (error) {
+      console.error("[NFT] Failed to proxy image", error);
+      res.status(502).json({ error: "Unable to fetch NFT image" });
+    }
+  });
+
   router.get("/games", async (_req: Request, res: Response) => {
     try {
       const games = casinoService.getAvailableGames();
-      res.json(games.map(g => ({
-        id: g.id,
-        name: g.name,
-        minBet: g.getMinBet(),
-        maxBet: g.getMaxBet()
+      res.json(games.map(game => ({
+        id: game.id,
+        name: game.name,
+        minBet: game.getMinBet(),
+        maxBet: game.getMaxBet(),
+        metadata: typeof game.getSummary === "function" ? game.getSummary() : null
       })));
     } catch (error: any) {
       res.status(500).json({ error: error.message });

@@ -8,6 +8,9 @@ interface Props {
   history: ApiGameResult[];
   onLogin: (name: string, password: string) => Promise<void>;
   onRegister: (name: string, password: string, balance: number) => Promise<void>;
+  onGoogleAuth: (payload: { email: string; name: string; googleId: string }) => Promise<void>;
+  onForgotPassword: (email: string) => Promise<{ message: string; resetToken?: string }>;
+  onResetPassword: (token: string, password: string) => Promise<void>;
   onOpenDeposit: () => void;
   onRefreshHistory: () => Promise<void>;
   onLogout?: () => void;
@@ -20,6 +23,9 @@ const PersonalAccount: React.FC<Props> = ({
   history,
   onLogin,
   onRegister,
+  onGoogleAuth,
+  onForgotPassword,
+  onResetPassword,
   onOpenDeposit,
   onRefreshHistory,
   onLogout,
@@ -75,6 +81,9 @@ const PersonalAccount: React.FC<Props> = ({
           onClose={() => setAuthModalOpen(false)}
           onLogin={({ name, password }) => onLogin(name, password)}
           onRegister={({ name, password, balance }) => onRegister(name, password, balance ?? 1000)}
+          onGoogleAuth={onGoogleAuth}
+          onForgotPassword={onForgotPassword}
+          onResetPassword={onResetPassword}
           isBusy={isBusy}
         />
       </>

@@ -24,6 +24,11 @@ const persistToStorage = (value: ApiUser | null) => {
   }
 };
 
+// Clear old cached user on load to force fresh data from server
+if (typeof window !== "undefined") {
+  window.localStorage.removeItem(STORAGE_KEY);
+}
+
 export function useCasino() {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [games, setGames] = useState<ApiGame[]>([]);
@@ -155,16 +160,24 @@ export function useCasino() {
       if (trimmedPassword.length < 6) {
         throw new Error("Password must be at least 6 characters");
       }
+      let result: any = null;
       await runAuthAction(async () => {
         const response = await ApiService.registerUser({
           name: trimmedName,
           password: trimmedPassword,
           initialBalance: balance || 1000
         });
-        setToken(response.token);
-        persistUser(response.user);
-        await loadInitialData();
+        if (response && response.token) {
+          setToken(response.token);
+          persistUser(response.user);
+          await loadInitialData();
+          result = { success: true };
+        } else {
+          // verification required or other non-token response
+          result = response;
+        }
       });
+      return result;
     },
     [loadInitialData, persistUser, runAuthAction]
   );

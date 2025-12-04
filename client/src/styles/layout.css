@@ -429,3 +429,163 @@ main {
   font-size: 0.9rem;
   color: var(--muted);
 }
+
+@media (max-width: 1280px) {
+  .app-shell {
+    padding: 0 24px 64px;
+  }
+
+  .lobby-layout {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
+  .promo-aside {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    padding: 0 20px 56px;
+  }
+
+  .lobby-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 12px;
+    background: rgba(4, 7, 18, 0.9);
+    border-radius: var(--radius-lg);
+    position: sticky;
+    top: 72px;
+    z-index: 5;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    scrollbar-width: none;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebar-nav button {
+    flex: 0 0 auto;
+    min-width: 140px;
+    justify-content: center;
+  }
+
+  .promo-aside {
+    order: 3;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .promo-aside .promo-card {
+    flex: 1 1 280px;
+  }
+
+  .hero-carousel {
+    padding: 22px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+  }
+
+  .hero-slider-controls {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 0 8px 48px;
+  }
+
+  .primary-nav,
+  .promo-aside {
+    width: 100%;
+  }
+
+  .promo-aside .promo-card {
+    padding: 16px;
+  }
+
+  .lobby-layout {
+    gap: 12px;
+  }
+
+  .sidebar-nav {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .sidebar-nav button {
+    min-width: 100px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+
+  .hero-carousel {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .hero-carousel h2 {
+    font-size: 1.5rem;
+  }
+
+  .top-bar {
+    padding: 16px 8px;
+    gap: 12px;
+  }
+
+  .logo {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-shell {
+    padding: 0 6px 40px;
+  }
+
+  .sidebar-nav {
+    position: static;
+  }
+
+  .sidebar-nav button {
+    min-width: 90px;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+
+  .hero-carousel {
+    padding: 12px;
+    min-height: 160px;
+  }
+
+  .hero-carousel h2 {
+    font-size: 1.3rem;
+  }
+
+  .hero-carousel .hero-tag {
+    font-size: 0.7rem;
+  }
+
+  .promo-aside .promo-card {
+    padding: 12px;
+    flex: 1 1 100%;
+  }
+
+  .promo-aside .tournament-card h3 {
+    font-size: 1.1rem;
+  }
+}

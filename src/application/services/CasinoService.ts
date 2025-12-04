@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
+import { sendEmail } from "../../infrastructure/mail/EmailService";
 import { User, AuthProvider } from "../../domain/entities/User";
 import { GameResult } from "../../domain/entities/GameResult";
 import { IUserRepository } from "../../domain/interfaces/IUserRepository";
@@ -56,7 +57,25 @@ export class CasinoService {
       'local',
       null
     );
+
+    // If email provided, create verification token and send email
+    if (isEmail && user.email) {
+      // generate a 4-digit numeric code as verification token
+      const token = String(Math.floor(1000 + Math.random() * 9000));
+      const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      user.setEmailVerification(token, expiry);
+    }
+
     await this.userRepository.save(user);
+
+    // send verification email (async, don't block on send)
+    if (isEmail && user.email && user.emailVerificationToken) {
+      const verifyUrl = `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/?verify=${encodeURIComponent(user.emailVerificationToken)}`;
+      const subject = 'Verify your email';
+      const text = `Your verification code: ${user.emailVerificationToken}\nOpen the app and paste the code or follow: ${verifyUrl}`;
+      void sendEmail(user.email, subject, text, `<p>Your verification code: <strong>${user.emailVerificationToken}</strong></p><p>Or click <a href="${verifyUrl}">verify</a></p>`);
+    }
+
     return user;
   }
 
@@ -173,7 +192,27 @@ export class CasinoService {
     user.setResetToken(resetToken, expiry);
     await this.userRepository.save(user);
     
+    // send reset email
+    const subject = 'Password reset';
+    const text = `Your password reset code: ${resetToken}`;
+    void sendEmail(user.email ?? '', subject, text, `<p>Your password reset code: <strong>${resetToken}</strong></p>`);
     return resetToken;
+  }
+
+  async verifyEmail(token: string): Promise<User> {
+    // We can't reuse reset token index; lookup by email verification token via repository
+    const repoUser = await (this.userRepository as any).findByVerificationToken(token);
+    if (!repoUser) {
+      throw new Error('Invalid or expired verification token');
+    }
+    // check expiry
+    if (!repoUser.emailVerificationExpiry || repoUser.emailVerificationExpiry < new Date()) {
+      throw new Error('Verification token expired');
+    }
+    // mark verified
+    (repoUser as any).verifyEmail?.();
+    await this.userRepository.save(repoUser as any);
+    return repoUser as any;
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {

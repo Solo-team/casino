@@ -1,98 +1,135 @@
 import React, { useMemo, useState } from "react";
-import type { ApiGame } from "../../types/api";
+import type { ApiGame, NftSymbolSummary } from "../../types/api";
 import type { GameContext } from "../types";
+
+type RarityFilter = "all" | NftSymbolSummary["rarity"];
 
 interface Props {
   games: ApiGame[];
   onSelect: (game: GameContext) => void;
 }
 
-const GAME_ICONS: Record<string, string> = {
-  blackjack: "🂡",
-  roulette: "🎰",
-  "slot-machine": "🎲",
-  "neon-trails": "⚡",
-  "vault-heist": "💎",
-  "aether-bonanza": "✨"
-};
-
-const GAME_GRADIENTS: Record<string, string> = {
-  blackjack: "linear-gradient(135deg, #1a2a3a 0%, #0f1a2a 100%)",
-  roulette: "linear-gradient(135deg, #2d1b3d 0%, #1a0f2e 100%)",
-  "slot-machine": "linear-gradient(135deg, #3a2d1b 0%, #2a1f0f 100%)",
-  "neon-trails": "linear-gradient(135deg, #0a1d3d 0%, #18a4ff 100%)",
-  "vault-heist": "linear-gradient(135deg, #1c0f3b 0%, #7cf2ff 100%)",
-  "aether-bonanza": "linear-gradient(135deg, #102231 0%, #9bf94a 100%)"
+const rarityPalette: Record<NftSymbolSummary["rarity"], string> = {
+  legendary: "#f0b90b",
+  rare: "#4dd5ff",
+  common: "#8e9cb5"
 };
 
 const GamesGrid: React.FC<Props> = ({ games, onSelect }) => {
   const [query, setQuery] = useState("");
+  const [rarityFilter, setRarityFilter] = useState<RarityFilter>("all");
 
   const filteredGames = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
-    if (!trimmed) return games;
-    return games.filter(game => game.name.toLowerCase().includes(trimmed));
-  }, [games, query]);
+    return games.filter(game => {
+      const matchesQuery = !trimmed || game.name.toLowerCase().includes(trimmed);
+      if (!matchesQuery) {
+        return false;
+      }
+      if (rarityFilter === "all") {
+        return true;
+      }
+      const symbols = game.metadata?.symbols ?? [];
+      return symbols.some(symbol => symbol.rarity === rarityFilter);
+    });
+  }, [games, query, rarityFilter]);
 
-  const getGameIcon = (gameId: string) => {
-    return GAME_ICONS[gameId] || "🎮";
+  const handleSelect = (game: ApiGame) => {
+    onSelect({
+      id: game.id,
+      name: game.name,
+      minBet: game.minBet,
+      maxBet: game.maxBet,
+      metadata: game.metadata ?? null
+    });
   };
 
-  const getGameGradient = (gameId: string) => {
-    return GAME_GRADIENTS[gameId] || "linear-gradient(135deg, #1a2a3a 0%, #0f1a2a 100%)";
+  const renderSymbolStack = (symbols: NftSymbolSummary[] = []) => {
+    return symbols.slice(0, 4).map(symbol => (
+      <span key={symbol.id} className={`symbol-pill ${symbol.rarity}`}>
+        <img src={symbol.imageUrl} alt={symbol.name} loading="lazy" />
+      </span>
+    ));
+  };
+
+  const renderRarityBar = (game: ApiGame) => {
+    const total = game.metadata?.itemCount ?? 1;
+    const breakdown = game.metadata?.rarity ?? { legendary: 0, rare: 0, common: total };
+    return (
+      <div className="rarity-bar">
+        {(["legendary", "rare", "common"] as const).map(key => {
+          const percent = Math.max(2, Math.round(((breakdown[key] ?? 0) / total) * 100));
+          return <span key={key} style={{ width: `${percent}%`, background: rarityPalette[key] }} />;
+        })}
+      </div>
+    );
   };
 
   return (
-    <section className="games-grid-section">
-      <div className="games-grid-header">
+    <section className="nft-gallery">
+      <header className="nft-gallery__header">
         <div>
-          <h3>Premium Games</h3>
-          <p className="muted">Choose your game and start playing</p>
+          <p className="eyebrow">NFT slots</p>
+          <h3>Pick a collection</h3>
+          <p className="muted">Every spin pulls real metadata from GetGems drops.</p>
         </div>
-        {games.length > 0 && (
-          <div className="search-bar">
-            <input
-              className="input search-input"
-              type="search"
-              placeholder="Search games..."
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-            />
+        <div className="nft-gallery__filters">
+          <div className="filter-pills">
+            {(["all", "legendary", "rare"] as const).map(filter => (
+              <button
+                key={filter}
+                type="button"
+                className={rarityFilter === filter ? "active" : undefined}
+                onClick={() => setRarityFilter(filter)}
+              >
+                {filter === "all" ? "All" : filter}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
-      
+          <input
+            className="input search-input"
+            type="search"
+            placeholder="Search Plush Pepe..."
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+          />
+        </div>
+      </header>
+
       {games.length === 0 ? (
         <div className="games-empty">
-          <p className="muted">Loading games...</p>
+          <p className="muted">Loading NFT drops...</p>
         </div>
       ) : filteredGames.length === 0 ? (
         <div className="games-empty">
-          <p className="muted">No games match your search. Try another query.</p>
+          <p className="muted">No drops in this filter. Try another rarity tier.</p>
         </div>
       ) : (
-        <div className="games-grid-main">
+        <div className="nft-grid">
           {filteredGames.map(game => (
-            <div
-              key={game.id}
-              className="game-card-featured"
-              style={{ background: getGameGradient(game.id) }}
-              onClick={() => onSelect({ id: game.id, name: game.name, minBet: game.minBet, maxBet: game.maxBet })}
-            >
-              <div className="game-card-featured__icon">
-                {getGameIcon(game.id)}
+            <button key={game.id} className="nft-card" type="button" onClick={() => handleSelect(game)}>
+              <div className="nft-card__art" style={{ backgroundImage: `url(${game.metadata?.previewImage ?? ""})` }}>
+                <div className="nft-card__symbols">{renderSymbolStack(game.metadata?.symbols)}</div>
+                <span className="nft-card__chance">
+                  {(game.metadata?.winChance ?? 0.01) * 100 < 1
+                    ? `${((game.metadata?.winChance ?? 0.01) * 100).toFixed(2)}%`
+                    : `${((game.metadata?.winChance ?? 0.01) * 100).toFixed(1)}%`} chance
+                </span>
               </div>
-              <div className="game-card-featured__content">
-                <h4>{game.name}</h4>
-                <p className="game-card-featured__meta">
-                  <span>Bet: {game.minBet} - {game.maxBet}</span>
-                </p>
-                <div className="game-card-featured__overlay">
-                  <button className="button button-primary">Play Now</button>
+              <div className="nft-card__body">
+                <div>
+                  <h4>{game.name}</h4>
+                  <p className="muted">{game.metadata?.priceStats ? `Median ${Math.round(game.metadata.priceStats.median).toLocaleString()} TON` : "Price feed live"}</p>
+                </div>
+                <div>
+                  <small>Stake</small>
+                  <strong>
+                    {game.minBet} – {game.maxBet}
+                  </strong>
                 </div>
               </div>
-              <div className="game-card-featured__glow" />
-            </div>
+              {renderRarityBar(game)}
+            </button>
           ))}
         </div>
       )}
