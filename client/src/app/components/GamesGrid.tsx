@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import type { ApiGame, NftSymbolSummary } from "../../types/api";
 import type { GameContext } from "../types";
 
@@ -13,6 +13,87 @@ const rarityPalette: Record<NftSymbolSummary["rarity"], string> = {
   legendary: "#f0b90b",
   rare: "#4dd5ff",
   common: "#8e9cb5"
+};
+
+// Анимированная мини-рулетка для превью карточки (горизонтальная, справа налево)
+const MiniSlotPreview: React.FC<{ symbols: NftSymbolSummary[]; previewImage?: string }> = ({ symbols, previewImage }) => {
+  const [offset, setOffset] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const animRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
+
+  // Определяем мобильное устройство
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile || symbols.length < 2) return;
+
+    const ITEM_SIZE = 100; // ширина элемента
+    const TOTAL_ITEMS = symbols.length;
+    const STRIP_WIDTH = ITEM_SIZE * TOTAL_ITEMS;
+    const SPEED = 40; // пикселей в секунду - медленная прокрутка справа налево
+
+    const animate = (timestamp: number) => {
+      if (!startTimeRef.current) startTimeRef.current = timestamp;
+      const elapsed = timestamp - startTimeRef.current;
+      const newOffset = (elapsed * SPEED / 1000) % STRIP_WIDTH;
+      
+      setOffset(newOffset);
+      animRef.current = requestAnimationFrame(animate);
+    };
+
+    animRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animRef.current) {
+        cancelAnimationFrame(animRef.current);
+      }
+    };
+  }, [symbols.length, isMobile]);
+
+  // На мобилке показываем статичную картинку
+  if (isMobile) {
+    return (
+      <div className="mini-slot-preview static">
+        {previewImage ? (
+          <img src={previewImage} alt="Preview" />
+        ) : symbols[0] ? (
+          <img src={symbols[0].imageUrl} alt={symbols[0].name} />
+        ) : null}
+      </div>
+    );
+  }
+
+  if (symbols.length < 2) {
+    return (
+      <div className="mini-slot-preview static">
+        {symbols[0] && <img src={symbols[0].imageUrl} alt={symbols[0].name} />}
+      </div>
+    );
+  }
+
+  // Дублируем для бесшовной прокрутки
+  const displaySymbols = [...symbols, ...symbols, ...symbols];
+
+  return (
+    <div className="mini-slot-preview horizontal">
+      <div 
+        className="mini-slot-strip-h"
+        style={{ transform: `translateX(-${offset}px)` }}
+      >
+        {displaySymbols.map((sym, idx) => (
+          <div key={`${sym.id}-${idx}`} className="mini-slot-item-h">
+            <img src={sym.imageUrl} alt={sym.name} loading="lazy" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const GamesGrid: React.FC<Props> = ({ games, onSelect }) => {
@@ -108,7 +189,8 @@ const GamesGrid: React.FC<Props> = ({ games, onSelect }) => {
         <div className="nft-grid">
           {filteredGames.map(game => (
             <button key={game.id} className="nft-card" type="button" onClick={() => handleSelect(game)}>
-              <div className="nft-card__art" style={{ backgroundImage: `url(${game.metadata?.previewImage ?? ""})` }}>
+              <div className="nft-card__art">
+                <MiniSlotPreview symbols={game.metadata?.symbols ?? []} previewImage={game.metadata?.previewImage} />
                 <div className="nft-card__symbols">{renderSymbolStack(game.metadata?.symbols)}</div>
                 <span className="nft-card__chance">
                   {(game.metadata?.winChance ?? 0.01) * 100 < 1

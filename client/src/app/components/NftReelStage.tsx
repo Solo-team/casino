@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { NftSymbolSummary } from "../../types/api";
 
 export type SlotMode = "classic" | "expanded";
@@ -16,7 +16,8 @@ interface Props {
   highlightWin?: boolean;
   mode?: SlotMode;
   freeSpinState?: FreeSpinState;
-  freeSpinPositions?: number[]; // индексы ячеек где выпал free spin
+  freeSpinPositions?: number[];
+  onAllSettled?: () => void; // вызывается когда все барабаны остановились
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -26,10 +27,8 @@ const EXPANDED_CELLS = 9;
 const SYMBOLS_IN_STRIP = 25;
 const ITEM_HEIGHT = 140;
 
-// Don't proxy local files (starting with /)
 const buildProxyUrl = (url?: string): string => {
   if (!url) return "";
-  // Local files don't need proxy
   if (url.startsWith("/")) return url;
   return `${API_BASE}/nft/image?url=${encodeURIComponent(url)}`;
 };
@@ -55,7 +54,6 @@ const generateStrip = (pool: NftSymbolSummary[], finalSymbol: NftSymbolSummary):
   return strip;
 };
 
-// Извлечь доминирующий цвет из картинки
 const extractDominantColor = (img: HTMLImageElement): string => {
   try {
     const canvas = document.createElement("canvas");
@@ -70,7 +68,7 @@ const extractDominantColor = (img: HTMLImageElement): string => {
     let r = 0, g = 0, b = 0, count = 0;
     
     for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] > 128) { // достаточно непрозрачный
+      if (data[i + 3] > 128) {
         r += data[i];
         g += data[i + 1];
         b += data[i + 2];
@@ -119,14 +117,13 @@ const Reel: React.FC<ReelProps> = ({
   const [borderColor, setBorderColor] = useState("rgba(61, 67, 99, 0.5)");
   const animationRef = useRef<number | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const prevSpinningRef = useRef<boolean>(false);
 
-  // Stagger для каскадной остановки
-  const BASE_DURATION = 1600;
+  const BASE_DURATION = 2000;
   const STAGGER = totalReels > 3 ? 150 : 400;
   const totalDuration = BASE_DURATION + reelIndex * STAGGER;
   const targetOffset = (SYMBOLS_IN_STRIP - 1) * ITEM_HEIGHT;
 
-  // Извлекаем цвет из финального изображения
   useEffect(() => {
     if (finalSymbol.imageUrl && !isFreeSpinSymbol) {
       const img = new Image();
@@ -142,13 +139,21 @@ const Reel: React.FC<ReelProps> = ({
   }, [finalSymbol.imageUrl, isFreeSpinSymbol]);
 
   useEffect(() => {
-    if (isSpinning && phase === "idle") {
+    const wasSpinning = prevSpinningRef.current;
+    prevSpinningRef.current = isSpinning;
+    
+    if (isSpinning && !wasSpinning) {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      
       const newStrip = generateStrip(pool, finalSymbol);
       setStrip(newStrip);
       setTranslateY(0);
       setPhase("spinning");
     }
-  }, [isSpinning]);
+  }, [isSpinning, finalSymbol, pool]);
 
   useEffect(() => {
     if (phase !== "spinning") return;
@@ -246,53 +251,80 @@ const NftReelStage: React.FC<Props> = ({
   activeSymbols, 
   isSpinning, 
   highlightWin,
-  mode = "classic",
+  mode = "expanded",
   freeSpinState,
-  freeSpinPositions = []
+  freeSpinPositions = [],
+  onAllSettled
 }) => {
-  const cellCount = mode === "expanded" ? EXPANDED_CELLS : CLASSIC_CELLS;
+  const cellCount = mode === "classic" ? CLASSIC_CELLS : EXPANDED_CELLS;
+  const prevSpinningRef = useRef<boolean>(false);
+  const settledTimeoutRef = useRef<number | null>(null);
+  const onAllSettledRef = useRef(onAllSettled);
+  
+  // Обновляем ref при изменении callback
+  useEffect(() => {
+    onAllSettledRef.current = onAllSettled;
+  }, [onAllSettled]);
   
   const reelSymbols = activeSymbols && activeSymbols.length === cellCount
     ? activeSymbols
     : Array.from({ length: cellCount }, (_, i) => pool[i % pool.length] || fallbackSymbol(i));
 
-  const gridClass = mode === "expanded" ? "nft-reel-stage expanded" : "nft-reel-stage";
-  const inFreeMode = freeSpinState?.active || false;
+  // Вычисляем когда последний барабан остановится
+  useEffect(() => {
+    const wasSpinning = prevSpinningRef.current;
+    prevSpinningRef.current = isSpinning;
+    
+    if (isSpinning && !wasSpinning) {
+      // Очищаем предыдущий таймаут
+      if (settledTimeoutRef.current) {
+        clearTimeout(settledTimeoutRef.current);
+        settledTimeoutRef.current = null;
+      }
+      
+      // Рассчитываем полную длительность анимации
+      const BASE_DURATION = 2000;
+      const STAGGER = cellCount > 3 ? 150 : 400;
+      const lastReelDuration = BASE_DURATION + (cellCount - 1) * STAGGER;
+      const totalWait = lastReelDuration + 300; // +300ms для безопасности
+      
+      settledTimeoutRef.current = window.setTimeout(() => {
+        settledTimeoutRef.current = null;
+        onAllSettledRef.current?.();
+      }, totalWait);
+    }
+  }, [isSpinning, cellCount]);
+
+  const stageClass = `nft-reel-stage ${mode === "expanded" ? "expanded" : ""} ${freeSpinState?.active ? "free-spin-active" : ""}`;
 
   return (
-    <div className={`${gridClass} ${inFreeMode ? "free-spin-active" : ""}`}>
-      {/* Free Spin Counter */}
-      {inFreeMode && freeSpinState && (
-        <div className="free-spin-counter">
-          <span className="free-spin-badge">🎰 FREE SPINS</span>
-          <span className="free-spin-count">{freeSpinState.remaining} / {freeSpinState.total}</span>
+    <div className={stageClass}>
+      {freeSpinState?.active && (
+        <div className="free-spin-banner">
+          <span className="free-spin-icon">🎰</span>
+          FREE SPINS: {freeSpinState.remaining} / {freeSpinState.total}
+          <span className="free-spin-icon">🎰</span>
         </div>
       )}
       
-      {Array.from({ length: cellCount }).map((_, index) => (
-        <Reel
-          key={index}
-          pool={pool}
-          finalSymbol={reelSymbols[index] || fallbackSymbol(index)}
-          isSpinning={isSpinning}
-          highlight={Boolean(highlightWin)}
-          reelIndex={index}
-          totalReels={cellCount}
-          isFreeSpinSymbol={freeSpinPositions.includes(index)}
-          inFreeSpinMode={inFreeMode}
-        />
-      ))}
-      
-      {/* Free Spin Overlay Effect */}
-      {inFreeMode && (
-        <div className="free-spin-overlay">
-          <div className="sparkle sparkle-1" />
-          <div className="sparkle sparkle-2" />
-          <div className="sparkle sparkle-3" />
-          <div className="sparkle sparkle-4" />
-          <div className="sparkle sparkle-5" />
-        </div>
-      )}
+      {Array.from({ length: cellCount }).map((_, index) => {
+        const symbol = reelSymbols[index] || fallbackSymbol(index);
+        const isFreeSpinSymbol = freeSpinPositions.includes(index);
+        
+        return (
+          <Reel
+            key={index}
+            pool={pool}
+            finalSymbol={symbol}
+            isSpinning={isSpinning}
+            highlight={Boolean(highlightWin)}
+            reelIndex={index}
+            totalReels={cellCount}
+            isFreeSpinSymbol={isFreeSpinSymbol}
+            inFreeSpinMode={freeSpinState?.active}
+          />
+        );
+      })}
     </div>
   );
 };

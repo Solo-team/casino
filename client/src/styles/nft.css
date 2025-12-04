@@ -252,8 +252,87 @@
   position: relative;
   padding: 0.75rem;
   height: 180px;
-  background-size: cover;
-  background-position: center;
+  background: linear-gradient(135deg, rgba(10, 15, 30, 0.9), rgba(20, 25, 40, 0.8));
+  overflow: hidden;
+}
+
+/* Анимированная мини-рулетка в карточке */
+.mini-slot-preview {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.mini-slot-preview.static {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-slot-preview.static img {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+/* Горизонтальная прокрутка справа налево */
+.mini-slot-preview.horizontal {
+  display: flex;
+  align-items: center;
+}
+
+.mini-slot-strip-h {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  will-change: transform;
+}
+
+.mini-slot-item-h {
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.mini-slot-item-h img {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  border-radius: 12px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+  opacity: 0.85;
+  transition: opacity 0.3s ease;
+}
+
+.nft-card:hover .mini-slot-item-h img {
+  opacity: 1;
+}
+
+/* Градиенты для горизонтальной прокрутки */
+.mini-slot-preview.horizontal::before,
+.mini-slot-preview.horizontal::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.mini-slot-preview.horizontal::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(10, 15, 30, 0.95), transparent);
+}
+
+.mini-slot-preview.horizontal::after {
+  right: 0;
+  background: linear-gradient(270deg, rgba(10, 15, 30, 0.95), transparent);
 }
 
 .nft-card__symbols {
@@ -767,6 +846,7 @@
 }
 
 .mode-btn {
+  position: relative;
   padding: 0.6rem 1.25rem;
   border-radius: 12px;
   border: 2px solid rgba(255, 255, 255, 0.1);
@@ -792,6 +872,37 @@
 .mode-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.mode-btn.spinning {
+  animation: pulse-spin-indicator 1s ease-in-out infinite;
+}
+
+.mode-btn.spinning::after {
+  content: "";
+  position: relative;
+  display: inline-block;
+  margin-left: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(77, 213, 255, 0.8);
+  animation: blink 0.6s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes pulse-spin-indicator {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(77, 213, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(77, 213, 255, 0.1);
+  }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 /* Spin Price Display */

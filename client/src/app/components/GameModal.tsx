@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useCallback } from "react";
+﻿import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import type { ApiGameResult, NftSymbolSummary } from "../../types/api";
 import type { GameContext } from "../types";
 import NftReelStage, { type SlotMode, type FreeSpinState } from "./NftReelStage";
@@ -44,6 +44,24 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
   const [freeSpins, setFreeSpins] = useState<FreeSpinState>({ active: false, remaining: 0, total: 0 });
   const [freeSpinPositions, setFreeSpinPositions] = useState<number[]>([]);
   const [autoPlayFree, setAutoPlayFree] = useState(false);
+  
+  // Независимые состояния для каждого режима
+  const [classicState, setClassicState] = useState<{
+    isSpinning: boolean;
+    symbols: NftSymbolSummary[] | null;
+    settled: boolean;
+    result: ApiGameResult | null;
+  }>({ isSpinning: false, symbols: null, settled: true, result: null });
+  
+  const [expandedState, setExpandedState] = useState<{
+    isSpinning: boolean;
+    symbols: NftSymbolSummary[] | null;
+    settled: boolean;
+    result: ApiGameResult | null;
+  }>({ isSpinning: false, symbols: null, settled: true, result: null });
+  
+  const spinTimeoutClassicRef = useRef<number | null>(null);
+  const spinTimeoutExpandedRef = useRef<number | null>(null);
 
   const metadata = game?.metadata;
   
@@ -70,16 +88,61 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
 
   const nftData = (result?.gameData ?? null) as NftGameResultData | null;
   
-  const cellCount = mode === "expanded" ? 9 : 3;
-  const spinSymbols = useMemo(() => {
-    if (!nftData?.symbols || !Array.isArray(nftData.symbols)) {
-      return null;
+  // Обновляем состояние нужного режима когда приходит результат
+  useEffect(() => {
+    if (result && nftData?.symbols) {
+      const resultMode = (result.gameData as any)?.mode as SlotMode || mode;
+      const symbols = nftData.symbols;
+      
+      if (resultMode === "classic") {
+        setClassicState(prev => ({ ...prev, symbols: symbols.slice(0, 3), result }));
+      } else {
+        setExpandedState(prev => ({ ...prev, symbols: symbols.slice(0, 9), result }));
+      }
     }
-    return nftData.symbols.slice(0, cellCount);
-  }, [nftData, cellCount]);
+  }, [result, nftData?.symbols]);
+  
+  // Таймеры для завершения анимации каждого режима
+  useEffect(() => {
+    if (classicState.isSpinning && !isPlaying) {
+      const BASE_DURATION = 2000;
+      const STAGGER = 400;
+      const totalWait = BASE_DURATION + 2 * STAGGER + 500;
+      
+      spinTimeoutClassicRef.current = window.setTimeout(() => {
+        setClassicState(prev => ({ ...prev, isSpinning: false, settled: true }));
+      }, totalWait);
+      
+      return () => {
+        if (spinTimeoutClassicRef.current) clearTimeout(spinTimeoutClassicRef.current);
+      };
+    }
+  }, [classicState.isSpinning, isPlaying]);
+  
+  useEffect(() => {
+    if (expandedState.isSpinning && !isPlaying) {
+      const BASE_DURATION = 2000;
+      const STAGGER = 150;
+      const totalWait = BASE_DURATION + 8 * STAGGER + 500;
+      
+      spinTimeoutExpandedRef.current = window.setTimeout(() => {
+        setExpandedState(prev => ({ ...prev, isSpinning: false, settled: true }));
+      }, totalWait);
+      
+      return () => {
+        if (spinTimeoutExpandedRef.current) clearTimeout(spinTimeoutExpandedRef.current);
+      };
+    }
+  }, [expandedState.isSpinning, isPlaying]);
 
-  const matched = Boolean(nftData?.matched);
-  const lastMultiplier = typeof nftData?.multiplier === "number" ? nftData.multiplier : null;
+  // Текущее состояние для активного режима
+  const currentState = mode === "classic" ? classicState : expandedState;
+  const setCurrentState = mode === "classic" ? setClassicState : setExpandedState;
+  
+  const matched = Boolean(currentState.result?.gameData && (currentState.result.gameData as any).matched);
+  const lastMultiplier = typeof (currentState.result?.gameData as any)?.multiplier === "number" 
+    ? (currentState.result?.gameData as any).multiplier 
+    : null;
 
   // Обработка фри-спинов
   useEffect(() => {
@@ -111,27 +174,40 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
     }
   }, [result, isPlaying]);
 
-  // Автоматический фри-спин
+  // Автоматический фри-спин - ждём пока барабаны остановятся
   useEffect(() => {
-    if (autoPlayFree && freeSpins.active && freeSpins.remaining > 0 && !isPlaying) {
+    if (autoPlayFree && freeSpins.active && freeSpins.remaining > 0 && !isPlaying && currentState.settled) {
       const timer = setTimeout(() => {
+        setCurrentState(prev => ({ ...prev, settled: false, isSpinning: true }));
         void onPlay(0, { mode, freeSpinMode: true });
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [autoPlayFree, freeSpins, isPlaying, mode, onPlay]);
+  }, [autoPlayFree, freeSpins, isPlaying, mode, onPlay, currentState.settled]);
 
   if (!game) {
     return null;
   }
 
-  const disabled = isPlaying || spinPrice > userBalance;
+  // Блокируем если: играем в текущем режиме, барабаны ещё не остановились, или недостаточно баланса
+  const disabled = isPlaying || !currentState.settled || spinPrice > userBalance;
 
   const handlePlay = () => {
     if (disabled && !freeSpins.active) return;
+    
+    // Запускаем спин для текущего режима
+    setCurrentState(prev => ({ ...prev, isSpinning: true, settled: false }));
     const betAmount = freeSpins.active ? 0 : spinPrice;
     void onPlay(betAmount, { mode, freeSpinMode: freeSpins.active });
   };
+
+  const handleAllSettled = useCallback((settledMode: SlotMode) => {
+    if (settledMode === "classic") {
+      setClassicState(prev => ({ ...prev, settled: true, isSpinning: false }));
+    } else {
+      setExpandedState(prev => ({ ...prev, settled: true, isSpinning: false }));
+    }
+  }, []);
 
   const toggleMode = () => {
     setMode(prev => prev === "classic" ? "expanded" : "classic");
@@ -156,17 +232,17 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
           </button>
         </header>
 
-        {/* Mode Toggle */}
+        {/* Mode Toggle - можно переключаться даже во время спина */}
         <div className="mode-toggle">
           <button 
-            className={`mode-btn ${mode === "classic" ? "active" : ""}`}
+            className={`mode-btn ${mode === "classic" ? "active" : ""} ${classicState.isSpinning ? "spinning" : ""}`}
             onClick={() => setMode("classic")}
             disabled={freeSpins.active}
           >
             Classic 3
           </button>
           <button 
-            className={`mode-btn ${mode === "expanded" ? "active" : ""}`}
+            className={`mode-btn ${mode === "expanded" ? "active" : ""} ${expandedState.isSpinning ? "spinning" : ""}`}
             onClick={() => setMode("expanded")}
             disabled={freeSpins.active}
           >
@@ -174,15 +250,33 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
           </button>
         </div>
 
-        <NftReelStage
-          pool={selectedPool}
-          activeSymbols={spinSymbols}
-          isSpinning={isPlaying}
-          highlightWin={matched}
-          mode={mode}
-          freeSpinState={freeSpins}
-          freeSpinPositions={freeSpinPositions}
-        />
+        {/* Classic Mode - скрыт когда не активен */}
+        <div style={{ display: mode === "classic" ? "block" : "none" }}>
+          <NftReelStage
+            pool={selectedPool}
+            activeSymbols={classicState.symbols}
+            isSpinning={classicState.isSpinning}
+            highlightWin={Boolean((classicState.result?.gameData as any)?.matched)}
+            mode="classic"
+            freeSpinState={freeSpins}
+            freeSpinPositions={freeSpinPositions}
+            onAllSettled={() => handleAllSettled("classic")}
+          />
+        </div>
+        
+        {/* Expanded Mode - скрыт когда не активен */}
+        <div style={{ display: mode === "expanded" ? "block" : "none" }}>
+          <NftReelStage
+            pool={selectedPool}
+            activeSymbols={expandedState.symbols}
+            isSpinning={expandedState.isSpinning}
+            highlightWin={Boolean((expandedState.result?.gameData as any)?.matched)}
+            mode="expanded"
+            freeSpinState={freeSpins}
+            freeSpinPositions={freeSpinPositions}
+            onAllSettled={() => handleAllSettled("expanded")}
+          />
+        </div>
 
         {/* Spin Price Display */}
         <div className="spin-price-display">
