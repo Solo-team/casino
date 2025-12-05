@@ -280,8 +280,11 @@ export class CasinoService {
       throw new Error("Invalid bet amount");
     }
 
+    // Получаем количество спинов для бонуса новичкам
+    const userSpinCount = await this.gameResultRepository.countByUserId(userId);
+
     user.withdraw(betAmount);
-    const result = await game.play(userId, betAmount, gameData);
+    const result = await game.play(userId, betAmount, { ...gameData, userSpinCount });
 
     if (result.payout > 0) {
       user.deposit(result.payout);

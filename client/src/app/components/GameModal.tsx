@@ -18,6 +18,14 @@ interface NftGameResultData {
   multiplier?: number;
   chance?: number;
   collectionName?: string;
+  nearMiss?: boolean;
+  nearMissRefund?: number;
+  nearMissSymbolUrl?: string | null;
+  nearMissSymbolName?: string | null;
+  nearMissCount?: number; // Количество near-miss строк
+  twoMatch?: boolean;
+  twoMatchSymbolUrl?: string | null;
+  twoMatchSymbolName?: string | null;
   priceStats?: {
     min?: number;
     max?: number;
@@ -26,6 +34,11 @@ interface NftGameResultData {
   };
   freeSpinsTriggered?: boolean;
   freeSpinPositions?: number[];
+  shouldTriggerReSpin?: boolean; // Нужен ли автоматический ре-спин
+  reSpinColumns?: number[]; // Колонки для ре-спина (0, 1, 2)
+  winningLines?: number[][];
+  matchedSymbol?: NftSymbolSummary;
+  matchedSymbols?: NftSymbolSummary[]; // Все выигранные NFT
 }
 
 // TON icon SVG
@@ -72,18 +85,9 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
   }, [metadata?.priceStats?.average]);
 
   // Отбираем 10 карт: 8 дешёвых + 2 дорогих
+  // Бэкенд уже отправляет selectedPool (8 дешевых + 2 дорогих), используем как есть
   const selectedPool = useMemo(() => {
-    const symbols = metadata?.symbols ?? [];
-    if (symbols.length <= 10) return symbols;
-    
-    // Сортируем по цене
-    const sorted = [...symbols].sort((a, b) => a.priceValue - b.priceValue);
-    
-    // 8 дешёвых (первые) + 2 дорогих (последние)
-    const cheap = sorted.slice(0, 8);
-    const expensive = sorted.slice(-2);
-    
-    return [...cheap, ...expensive];
+    return metadata?.symbols ?? [];
   }, [metadata?.symbols]);
 
   const nftData = (result?.gameData ?? null) as NftGameResultData | null;
@@ -100,7 +104,7 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
         setExpandedState(prev => ({ ...prev, symbols: symbols.slice(0, 9), result }));
       }
     }
-  }, [result, nftData?.symbols]);
+  }, [result, nftData?.symbols, mode]);
   
   // Таймеры для завершения анимации каждого режима
   useEffect(() => {
@@ -140,9 +144,22 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
   const setCurrentState = mode === "classic" ? setClassicState : setExpandedState;
   
   const matched = Boolean(currentState.result?.gameData && (currentState.result.gameData as any).matched);
+  const nearMiss = Boolean(currentState.result?.gameData && (currentState.result.gameData as any).nearMiss);
+  const nearMissRefund = (currentState.result?.gameData as any)?.nearMissRefund ?? 0;
+  const nearMissCount = (currentState.result?.gameData as any)?.nearMissCount ?? 0; // Количество near-miss строк
+  const nearMissSymbolUrl = (currentState.result?.gameData as any)?.nearMissSymbolUrl as string | null | undefined;
+  const nearMissSymbolName = (currentState.result?.gameData as any)?.nearMissSymbolName as string | null | undefined;
+  const shouldTriggerReSpin = Boolean((currentState.result?.gameData as any)?.shouldTriggerReSpin);
+  const reSpinColumns = (currentState.result?.gameData as any)?.reSpinColumns as number[] | undefined;
+  const twoMatch = Boolean((currentState.result?.gameData as any)?.twoMatch);
+  const twoMatchSymbolUrl = (currentState.result?.gameData as any)?.twoMatchSymbolUrl as string | null | undefined;
+  const twoMatchSymbolName = (currentState.result?.gameData as any)?.twoMatchSymbolName as string | null | undefined;
   const lastMultiplier = typeof (currentState.result?.gameData as any)?.multiplier === "number" 
     ? (currentState.result?.gameData as any).multiplier 
     : null;
+  const winningLines = (currentState.result?.gameData as any)?.winningLines as number[][] | undefined;
+  const matchedSymbol = (currentState.result?.gameData as any)?.matchedSymbol as NftSymbolSummary | undefined;
+  const matchedSymbols = (currentState.result?.gameData as any)?.matchedSymbols as NftSymbolSummary[] | undefined;
 
   // Обработка фри-спинов
   useEffect(() => {
@@ -185,6 +202,22 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
     }
   }, [autoPlayFree, freeSpins, isPlaying, mode, onPlay, currentState.settled]);
 
+  // Автоматический ре-спин колонок с FREE wildcard
+  useEffect(() => {
+    if (shouldTriggerReSpin && reSpinColumns && reSpinColumns.length > 0 && currentState.settled && !isPlaying) {
+      // Ждем 1.5 секунды чтобы пользователь увидел FREE символы
+      const timer = setTimeout(() => {
+        // Запускаем ре-спин (тот же API вызов, но FREE будет работать как wildcard)
+        setCurrentState(prev => ({ ...prev, settled: false }));
+        const betAmount = freeSpins.active ? 0 : spinPrice;
+        void onPlay(betAmount, { mode, freeSpinMode: freeSpins.active }).then(() => {
+          setCurrentState(prev => ({ ...prev, isSpinning: true, settled: false }));
+        });
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldTriggerReSpin, reSpinColumns, currentState.settled, isPlaying, freeSpins.active, spinPrice, mode, onPlay]);
+
   if (!game) {
     return null;
   }
@@ -195,10 +228,13 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
   const handlePlay = () => {
     if (disabled && !freeSpins.active) return;
     
-    // Запускаем спин для текущего режима
-    setCurrentState(prev => ({ ...prev, isSpinning: true, settled: false }));
     const betAmount = freeSpins.active ? 0 : spinPrice;
-    void onPlay(betAmount, { mode, freeSpinMode: freeSpins.active });
+    
+    // Сначала получаем результат от API
+    void onPlay(betAmount, { mode, freeSpinMode: freeSpins.active }).then(() => {
+      // ПОСЛЕ получения ответа запускаем анимацию
+      setCurrentState(prev => ({ ...prev, isSpinning: true, settled: false }));
+    });
   };
 
   const handleAllSettled = useCallback((settledMode: SlotMode) => {
@@ -257,6 +293,7 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
             activeSymbols={classicState.symbols}
             isSpinning={classicState.isSpinning}
             highlightWin={Boolean((classicState.result?.gameData as any)?.matched)}
+            winningLines={mode === "classic" ? winningLines : undefined}
             mode="classic"
             freeSpinState={freeSpins}
             freeSpinPositions={freeSpinPositions}
@@ -271,9 +308,11 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
             activeSymbols={expandedState.symbols}
             isSpinning={expandedState.isSpinning}
             highlightWin={Boolean((expandedState.result?.gameData as any)?.matched)}
+            winningLines={mode === "expanded" ? winningLines : undefined}
             mode="expanded"
             freeSpinState={freeSpins}
             freeSpinPositions={freeSpinPositions}
+            reSpinColumns={mode === "expanded" ? reSpinColumns : undefined}
             onAllSettled={() => handleAllSettled("expanded")}
           />
         </div>
@@ -321,17 +360,74 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
         </div>
 
         {/* Result section */}
-        <section className={`nft-modal__result ${matched ? "win" : "pending"}`}>
+        <section className={`nft-modal__result ${matched ? "win" : nearMiss ? "near-miss" : "pending"}`}>
           <div>
             <span className="pill">{result?.resultType ?? "READY"}</span>
-            <p>
-              {matched 
-                ? "🎉 Matched! You won an NFT!" 
-                : freeSpins.active 
-                  ? "Free spin mode active!" 
-                  : "Match 3 identical NFTs to win!"
-              }
-            </p>
+            {matched && matchedSymbols && matchedSymbols.length > 0 ? (
+              <div className="win-nft-container">
+                {matchedSymbols.length === 1 ? (
+                  // Одна победа
+                  <div className="win-nft-display">
+                    <img 
+                      src={`/api/nft/image?url=${encodeURIComponent(matchedSymbols[0].imageUrl)}`} 
+                      alt={matchedSymbols[0].name}
+                      className="win-nft-image"
+                    />
+                    <div className="win-nft-info">
+                      <p className="win-message">🎉 You won!</p>
+                      <p className="win-nft-name">{matchedSymbols[0].name}</p>
+                      <p className="win-nft-price">
+                        <TonIcon />
+                        {formatNumber(matchedSymbols[0].priceValue)} TON
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  // Несколько побед
+                  <div className="multi-win-display">
+                    <p className="win-message">🎉🎉 MULTI WIN! {matchedSymbols.length} lines! 🎉🎉</p>
+                    <div className="multi-win-grid">
+                      {matchedSymbols.map((sym, idx) => (
+                        <div key={idx} className="mini-win-card">
+                          <img 
+                            src={`/api/nft/image?url=${encodeURIComponent(sym.imageUrl)}`} 
+                            alt={sym.name}
+                            className="mini-win-image"
+                          />
+                          <div className="mini-win-info">
+                            <p className="mini-win-name">{sym.name}</p>
+                            <p className="mini-win-price">
+                              <TonIcon />
+                              {formatNumber(sym.priceValue)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="total-win">
+                      <span>Total:</span>
+                      <span className="total-win-amount">
+                        <TonIcon />
+                        {formatNumber(matchedSymbols.reduce((sum, s) => sum + s.priceValue, 0))} TON
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p>
+                {shouldTriggerReSpin
+                  ? "🎁 FREE wildcard! Re-spinning columns..."
+                  : nearMiss
+                    ? nearMissCount > 1 
+                      ? `🔥 Multiple near-miss! ${nearMissCount}x 2 in a row - ${Math.round(nearMissRefund * 100) / 100} TON refunded!`
+                      : `🔥 So close! 2 in a row - ${Math.round(nearMissRefund * 100) / 100} TON refunded!`
+                    : freeSpins.active 
+                      ? "Free spin mode active!" 
+                      : "Match 3 identical NFTs to win!"
+                }
+              </p>
+            )}
           </div>
           {result && (
             <div className="result-chips">

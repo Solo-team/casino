@@ -521,6 +521,43 @@
   50% { opacity: 0.7; }
 }
 
+/* Re-spin Banner */
+.respin-banner {
+  position: absolute;
+  top: -55px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  z-index: 15;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 165, 0, 0.4));
+  padding: 0.6rem 1.8rem;
+  border-radius: 25px;
+  border: 2px solid rgba(255, 215, 0, 0.7);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #ffd700;
+  text-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+  animation: reSpinBounce 0.6s ease-in-out infinite alternate;
+}
+
+.respin-icon {
+  font-size: 1.4rem;
+  animation: reSpinSpin 2s linear infinite;
+}
+
+@keyframes reSpinBounce {
+  0% { transform: translateX(-50%) scale(1); }
+  100% { transform: translateX(-50%) scale(1.05); }
+}
+
+@keyframes reSpinSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* ========== SPECIAL EFFECTS ========== */
 
 /* Effect 1: Sparkles */
@@ -736,19 +773,21 @@
 
 .slot-item-v {
   width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem;
+  padding: 0;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .slot-item-v img {
-  width: 85%;
-  height: 85%;
-  object-fit: contain;
-  border-radius: 12px;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
   transition: filter 0.3s ease, transform 0.3s ease;
 }
 
@@ -995,12 +1034,13 @@
   }
 
   .slot-item-v {
-    padding: 0.4rem;
+    padding: 0;
   }
 
   .slot-item-v img {
-    width: 85%;
-    height: 85%;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .slot-label {
@@ -1064,9 +1104,10 @@
   }
   
   .slot-item-v img {
-    width: 80%;
-    height: 80%;
-    border-radius: 8px;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 0;
   }
 
   .slot-label {
@@ -1187,6 +1228,139 @@
 .nft-modal__result.win {
   border-color: rgba(240, 185, 11, 0.4);
   box-shadow: 0 0 18px rgba(240, 185, 11, 0.18);
+}
+
+.win-nft-display {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.win-nft-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 2px solid rgba(240, 185, 11, 0.6);
+  box-shadow: 0 4px 16px rgba(240, 185, 11, 0.3);
+}
+
+.win-nft-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.win-message {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #F0B90B;
+  margin: 0;
+  text-shadow: 0 2px 8px rgba(240, 185, 11, 0.4);
+}
+
+.win-nft-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--nft-text);
+  margin: 0;
+}
+
+.win-nft-price {
+  display: flex;
+  align-items: center;
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #4DD5FF;
+  margin: 0;
+}
+
+.multi-win-display {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.multi-win-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.mini-win-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(240, 185, 11, 0.3);
+  background: rgba(240, 185, 11, 0.05);
+}
+
+.mini-win-image {
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(240, 185, 11, 0.4);
+}
+
+.mini-win-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mini-win-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--nft-text);
+  margin: 0;
+}
+
+.mini-win-price {
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #4DD5FF;
+  margin: 0;
+}
+
+.total-win {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(240, 185, 11, 0.15), rgba(240, 185, 11, 0.05));
+  border: 2px solid rgba(240, 185, 11, 0.5);
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.total-win-amount {
+  display: flex;
+  align-items: center;
+  color: #F0B90B;
+  font-size: 1.4rem;
+  text-shadow: 0 2px 8px rgba(240, 185, 11, 0.4);
+}
+
+.nft-modal__result.near-miss {
+  border-color: rgba(255, 136, 0, 0.5);
+  box-shadow: 0 0 18px rgba(255, 136, 0, 0.25);
+  background: linear-gradient(135deg, rgba(255, 136, 0, 0.1), transparent);
+  animation: near-miss-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes near-miss-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
 }
 
 .result-chips {

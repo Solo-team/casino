@@ -58,6 +58,12 @@ export class TypeOrmGameResultRepository implements IGameResultRepository {
     return entities.map(e => this.toDomain(e));
   }
 
+  async countByUserId(userId: string): Promise<number> {
+    return this.repository.count({
+      where: { userId }
+    });
+  }
+
   private toDomain(entity: GameResultOrmEntity): GameResult {
     return new GameResult(
       entity.gameId,

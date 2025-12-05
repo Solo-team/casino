@@ -14,9 +14,11 @@ interface Props {
   activeSymbols: NftSymbolSummary[] | null;
   isSpinning: boolean;
   highlightWin?: boolean;
+  winningLines?: number[][]; // Массив выигрышных линий [6,7,8] etc
   mode?: SlotMode;
   freeSpinState?: FreeSpinState;
   freeSpinPositions?: number[];
+  reSpinColumns?: number[]; // Колонки для ре-спина (0, 1, 2) - для визуального выделения
   onAllSettled?: () => void; // вызывается когда все барабаны остановились
 }
 
@@ -153,7 +155,7 @@ const Reel: React.FC<ReelProps> = ({
       setTranslateY(0);
       setPhase("spinning");
     }
-  }, [isSpinning, finalSymbol, pool]);
+  }, [isSpinning, finalSymbol, pool, reelIndex]);
 
   useEffect(() => {
     if (phase !== "spinning") return;
@@ -251,12 +253,20 @@ const NftReelStage: React.FC<Props> = ({
   activeSymbols, 
   isSpinning, 
   highlightWin,
+  winningLines,
   mode = "expanded",
   freeSpinState,
   freeSpinPositions = [],
+  reSpinColumns = [],
   onAllSettled
 }) => {
   const cellCount = mode === "classic" ? CLASSIC_CELLS : EXPANDED_CELLS;
+  
+  // Определяем какие индексы выиграли
+  const winningIndices = new Set<number>();
+  if (highlightWin && winningLines && winningLines.length > 0) {
+    winningLines.forEach(line => line.forEach(idx => winningIndices.add(idx)));
+  }
   const prevSpinningRef = useRef<boolean>(false);
   const settledTimeoutRef = useRef<number | null>(null);
   const onAllSettledRef = useRef(onAllSettled);
@@ -269,6 +279,8 @@ const NftReelStage: React.FC<Props> = ({
   const reelSymbols = activeSymbols && activeSymbols.length === cellCount
     ? activeSymbols
     : Array.from({ length: cellCount }, (_, i) => pool[i % pool.length] || fallbackSymbol(i));
+
+
 
   // Вычисляем когда последний барабан остановится
   useEffect(() => {
@@ -295,6 +307,9 @@ const NftReelStage: React.FC<Props> = ({
     }
   }, [isSpinning, cellCount]);
 
+  // Показываем баннер если есть FREE символы (не триггер free spins)
+  const showReSpinBanner = freeSpinPositions.length > 0 && freeSpinPositions.length < 3 && !freeSpinState?.active;
+
   const stageClass = `nft-reel-stage ${mode === "expanded" ? "expanded" : ""} ${freeSpinState?.active ? "free-spin-active" : ""}`;
 
   return (
@@ -307,9 +322,18 @@ const NftReelStage: React.FC<Props> = ({
         </div>
       )}
       
+      {showReSpinBanner && (
+        <div className="respin-banner">
+          <span className="respin-icon">🎁</span>
+          FREE WILDCARD!
+          <span className="respin-icon">🎁</span>
+        </div>
+      )}
+      
       {Array.from({ length: cellCount }).map((_, index) => {
         const symbol = reelSymbols[index] || fallbackSymbol(index);
         const isFreeSpinSymbol = freeSpinPositions.includes(index);
+        const isWinningSymbol = winningIndices.has(index);
         
         return (
           <Reel
@@ -317,7 +341,7 @@ const NftReelStage: React.FC<Props> = ({
             pool={pool}
             finalSymbol={symbol}
             isSpinning={isSpinning}
-            highlight={Boolean(highlightWin)}
+            highlight={isWinningSymbol}
             reelIndex={index}
             totalReels={cellCount}
             isFreeSpinSymbol={isFreeSpinSymbol}

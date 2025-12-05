@@ -15,4 +15,8 @@ export class InMemoryGameResultRepository implements IGameResultRepository {
   async getAll(): Promise<GameResult[]> {
     return [...this.results];
   }
+
+  async countByUserId(userId: string): Promise<number> {
+    return this.results.filter(r => r.userId === userId).length;
+  }
 }
