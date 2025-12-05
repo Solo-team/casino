@@ -24,6 +24,12 @@ export interface ApiGame {
 
 export type NftRarity = "common" | "rare" | "legendary";
 
+export interface MultiplierSymbol {
+  value: number;        // 2-9
+  imageUrl: string;     // Path to multiplier icon
+  rarity: "common" | "rare" | "epic";
+}
+
 export interface NftSymbolSummary {
   id: string;
   name: string;

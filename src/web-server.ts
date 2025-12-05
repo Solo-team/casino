@@ -9,6 +9,7 @@ import { PaymentMethod } from "./domain/entities/PaymentTransaction";
 import { loadNftSlotGames } from "./domain/games/loadNftCollections";
 import { createApiRouter } from "./presentation/web/routes/api";
 import { createPaymentsRouter } from "./presentation/web/routes/payments";
+import shardRoutes from "./presentation/web/routes/shards";
 import { AppDataSource } from "./infrastructure/database/data-source";
 import { TypeOrmUserRepository } from "./infrastructure/repositories/TypeOrmUserRepository";
 import { TypeOrmGameResultRepository } from "./infrastructure/repositories/TypeOrmGameResultRepository";
@@ -261,6 +262,7 @@ const bootstrap = async (): Promise<void> => {
       : undefined;
 
     app.use("/api", createApiRouter(casinoService));
+    app.use("/api/shards", shardRoutes);
     app.use(
       "/api/payments",
       createPaymentsRouter(paymentService, {

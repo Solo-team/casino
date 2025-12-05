@@ -11,7 +11,8 @@
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "ts-node src/web-server.ts",
     "dev:client": "vite dev",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "simulate:rtp": "ts-node src/domain/games/run-simulation.ts"
   },
   "keywords": [
     "casino",

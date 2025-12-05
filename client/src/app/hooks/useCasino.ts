@@ -302,11 +302,19 @@ export function useCasino() {
       if (!user || !currentGame) return;
       setPlaying(true);
       try {
+        // Track user spin count for newbie boost (first 20 spins get 1.4x win chance)
+        const storageKey = `spinCount_${user.id}`;
+        const userSpinCount = parseInt(localStorage.getItem(storageKey) || "0", 10);
+        
         const result = await ApiService.playGame({
           gameId: currentGame.id,
           betAmount,
-          gameData
+          gameData: { ...gameData, userSpinCount }
         });
+        
+        // Increment spin count
+        localStorage.setItem(storageKey, String(userSpinCount + 1));
+        
         setLastGameResult(result);
         const updatedUser = await ApiService.getCurrentUser();
         persistUser(updatedUser);

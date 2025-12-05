@@ -39,7 +39,60 @@ interface NftGameResultData {
   winningLines?: number[][];
   matchedSymbol?: NftSymbolSummary;
   matchedSymbols?: NftSymbolSummary[]; // Все выигранные NFT
+  appliedMultiplier?: {
+    value: number;
+    rarity: string;
+  };
+  winBreakdown?: Record<string, number>;
+  mode?: SlotMode;
+  stickyWildPositions?: number[] | null;
+  newStickyWildPositions?: number[] | null;
+  freeSpinsAwarded?: number;
 }
+
+const SLOT_SESSION_VERSION = 1;
+const SLOT_SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
+
+interface PersistedSlotSession {
+  version: number;
+  timestamp: number;
+  mode: SlotMode;
+  freeSpins: FreeSpinState;
+  stickyWildPositions: number[];
+  displaySymbols?: {
+    expanded?: NftSymbolSummary[];
+    mode5?: NftSymbolSummary[];
+  };
+}
+
+const getSessionKey = (gameId: string) => `slot-session:${gameId}`;
+
+const loadSlotSession = (gameId: string): PersistedSlotSession | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(getSessionKey(gameId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedSlotSession;
+    if (parsed.version !== SLOT_SESSION_VERSION) return null;
+    if (Date.now() - parsed.timestamp > SLOT_SESSION_TTL_MS) {
+      window.localStorage.removeItem(getSessionKey(gameId));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const saveSlotSession = (gameId: string, payload: PersistedSlotSession) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(getSessionKey(gameId), JSON.stringify(payload));
+};
+
+const clearSlotSession = (gameId: string) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(getSessionKey(gameId));
+};
 
 // TON icon SVG
 const TonIcon = () => (
@@ -52,37 +105,83 @@ const TonIcon = () => (
 const formatNumber = (value: number) =>
   value.toLocaleString("en-US", { maximumFractionDigits: 4 });
 
+const INITIAL_FREE_SPIN_STATE: FreeSpinState = { active: false, remaining: 0, total: 0 };
+
 const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, userBalance = 0 }) => {
-  const [mode, setMode] = useState<SlotMode>("classic");
-  const [freeSpins, setFreeSpins] = useState<FreeSpinState>({ active: false, remaining: 0, total: 0 });
+  const [mode, setMode] = useState<SlotMode>("expanded");
+  const [freeSpins, setFreeSpins] = useState<FreeSpinState>(INITIAL_FREE_SPIN_STATE);
   const [freeSpinPositions, setFreeSpinPositions] = useState<number[]>([]);
+  const [stickyWildPositionsState, setStickyWildPositionsState] = useState<number[]>([]);
   const [autoPlayFree, setAutoPlayFree] = useState(false);
+  const [spinId, setSpinId] = useState(0);
+  const sessionGameIdRef = useRef<string | null>(null);
+  const prevFreeSpinActiveRef = useRef(freeSpins.active);
   
   // Независимые состояния для каждого режима
-  const [classicState, setClassicState] = useState<{
-    isSpinning: boolean;
-    symbols: NftSymbolSummary[] | null;
-    settled: boolean;
-    result: ApiGameResult | null;
-  }>({ isSpinning: false, symbols: null, settled: true, result: null });
-  
   const [expandedState, setExpandedState] = useState<{
     isSpinning: boolean;
-    symbols: NftSymbolSummary[] | null;
+    displaySymbols: NftSymbolSummary[] | null;
+    nextSymbols: NftSymbolSummary[] | null;
     settled: boolean;
     result: ApiGameResult | null;
-  }>({ isSpinning: false, symbols: null, settled: true, result: null });
+  }>({ isSpinning: false, displaySymbols: null, nextSymbols: null, settled: true, result: null });
   
-  const spinTimeoutClassicRef = useRef<number | null>(null);
+  const [mode5State, setMode5State] = useState<{
+    isSpinning: boolean;
+    displaySymbols: NftSymbolSummary[] | null;
+    nextSymbols: NftSymbolSummary[] | null;
+    settled: boolean;
+    result: ApiGameResult | null;
+  }>({ isSpinning: false, displaySymbols: null, nextSymbols: null, settled: true, result: null });
+  
   const spinTimeoutExpandedRef = useRef<number | null>(null);
+  const spinTimeoutMode5Ref = useRef<number | null>(null);
 
   const metadata = game?.metadata;
+
+  useEffect(() => {
+    if (!game) {
+      sessionGameIdRef.current = null;
+      setFreeSpins(INITIAL_FREE_SPIN_STATE);
+      setAutoPlayFree(false);
+      setStickyWildPositionsState([]);
+      return;
+    }
+
+    if (sessionGameIdRef.current === game.id) {
+      return;
+    }
+
+    sessionGameIdRef.current = game.id;
+    const savedSession = loadSlotSession(game.id);
+    if (!savedSession) {
+      return;
+    }
+
+    const hasActiveFreeSpins = savedSession.freeSpins?.active && savedSession.freeSpins.remaining > 0;
+    if (!hasActiveFreeSpins) {
+      clearSlotSession(game.id);
+      return;
+    }
+
+    setMode(savedSession.mode);
+    setFreeSpins(savedSession.freeSpins);
+    setAutoPlayFree(true);
+    setStickyWildPositionsState(savedSession.stickyWildPositions ?? []);
+    if (savedSession.displaySymbols?.expanded?.length) {
+      setExpandedState(prev => ({ ...prev, displaySymbols: savedSession.displaySymbols?.expanded ?? prev.displaySymbols }));
+    }
+    if (savedSession.displaySymbols?.mode5?.length) {
+      setMode5State(prev => ({ ...prev, displaySymbols: savedSession.displaySymbols?.mode5 ?? prev.displaySymbols }));
+    }
+  }, [game]);
   
-  // Статичная цена спина - 3% от средней стоимости NFT
+  // Динамическая цена спина: 3% (3x3) или 5% (5x5) от средней стоимости NFT
   const spinPrice = useMemo(() => {
     const avg = metadata?.priceStats?.average ?? 0;
-    return avg * 0.03;
-  }, [metadata?.priceStats?.average]);
+    const percentage = mode === "mode5" ? 0.05 : 0.03;
+    return avg * percentage;
+  }, [metadata?.priceStats?.average, mode]);
 
   // Отбираем 10 карт: 8 дешёвых + 2 дорогих
   // Бэкенд уже отправляет selectedPool (8 дешевых + 2 дорогих), используем как есть
@@ -90,39 +189,57 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
     return metadata?.symbols ?? [];
   }, [metadata?.symbols]);
 
-  const nftData = (result?.gameData ?? null) as NftGameResultData | null;
-  
+  // Инициализация отображаемых символов при загрузке пула
+  useEffect(() => {
+    if (selectedPool.length > 0) {
+      setExpandedState(prev => prev.displaySymbols ? prev : { ...prev, displaySymbols: selectedPool.slice(0, 9) });
+      setMode5State(prev => prev.displaySymbols ? prev : { ...prev, displaySymbols: selectedPool.slice(0, 25) });
+    }
+  }, [selectedPool]);
+
+  const persistSlotSession = useCallback((overrideFreeSpins?: FreeSpinState, overrideStickyWilds?: number[]) => {
+    if (!game) return;
+    const snapshotFreeSpins = overrideFreeSpins ?? freeSpins;
+    if (!snapshotFreeSpins.active || snapshotFreeSpins.remaining <= 0) {
+      clearSlotSession(game.id);
+      return;
+    }
+    const snapshotStickyWilds = overrideStickyWilds ?? stickyWildPositionsState;
+    saveSlotSession(game.id, {
+      version: SLOT_SESSION_VERSION,
+      timestamp: Date.now(),
+      mode,
+      freeSpins: snapshotFreeSpins,
+      stickyWildPositions: snapshotStickyWilds,
+      displaySymbols: {
+        expanded: expandedState.displaySymbols ?? undefined,
+        mode5: mode5State.displaySymbols ?? undefined
+      }
+    });
+  }, [game, freeSpins, stickyWildPositionsState, mode, expandedState.displaySymbols, mode5State.displaySymbols]);
+
+  useEffect(() => {
+    if (!game) return;
+    if (!freeSpins.active || freeSpins.remaining <= 0) return;
+    persistSlotSession();
+  }, [game, freeSpins, stickyWildPositionsState, persistSlotSession]);
+
   // Обновляем состояние нужного режима когда приходит результат
   useEffect(() => {
+    const nftData = (result?.gameData ?? null) as NftGameResultData | null;
     if (result && nftData?.symbols) {
-      const resultMode = (result.gameData as any)?.mode as SlotMode || mode;
+      const resultMode = nftData?.mode || mode;
       const symbols = nftData.symbols;
       
-      if (resultMode === "classic") {
-        setClassicState(prev => ({ ...prev, symbols: symbols.slice(0, 3), result }));
-      } else {
-        setExpandedState(prev => ({ ...prev, symbols: symbols.slice(0, 9), result }));
+      if (resultMode === "expanded") {
+        setExpandedState(prev => ({ ...prev, nextSymbols: symbols.slice(0, 9), result }));
+      } else if (resultMode === "mode5") {
+        setMode5State(prev => ({ ...prev, nextSymbols: symbols.slice(0, 25), result }));
       }
     }
-  }, [result, nftData?.symbols, mode]);
+  }, [result, mode]);
   
   // Таймеры для завершения анимации каждого режима
-  useEffect(() => {
-    if (classicState.isSpinning && !isPlaying) {
-      const BASE_DURATION = 2000;
-      const STAGGER = 400;
-      const totalWait = BASE_DURATION + 2 * STAGGER + 500;
-      
-      spinTimeoutClassicRef.current = window.setTimeout(() => {
-        setClassicState(prev => ({ ...prev, isSpinning: false, settled: true }));
-      }, totalWait);
-      
-      return () => {
-        if (spinTimeoutClassicRef.current) clearTimeout(spinTimeoutClassicRef.current);
-      };
-    }
-  }, [classicState.isSpinning, isPlaying]);
-  
   useEffect(() => {
     if (expandedState.isSpinning && !isPlaying) {
       const BASE_DURATION = 2000;
@@ -138,45 +255,77 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
       };
     }
   }, [expandedState.isSpinning, isPlaying]);
+  
+  useEffect(() => {
+    if (mode5State.isSpinning && !isPlaying) {
+      const BASE_DURATION = 2000;
+      const STAGGER = 100;
+      const totalWait = BASE_DURATION + 24 * STAGGER + 500;
+      
+      spinTimeoutMode5Ref.current = window.setTimeout(() => {
+        setMode5State(prev => ({ ...prev, isSpinning: false, settled: true }));
+      }, totalWait);
+      
+      return () => {
+        if (spinTimeoutMode5Ref.current) clearTimeout(spinTimeoutMode5Ref.current);
+      };
+    }
+  }, [mode5State.isSpinning, isPlaying]);
 
   // Текущее состояние для активного режима
-  const currentState = mode === "classic" ? classicState : expandedState;
-  const setCurrentState = mode === "classic" ? setClassicState : setExpandedState;
+  const currentState = mode === "expanded" ? expandedState : mode5State;
+  const setCurrentState = mode === "expanded" ? setExpandedState : setMode5State;
   
-  const matched = Boolean(currentState.result?.gameData && (currentState.result.gameData as any).matched);
-  const nearMiss = Boolean(currentState.result?.gameData && (currentState.result.gameData as any).nearMiss);
-  const nearMissRefund = (currentState.result?.gameData as any)?.nearMissRefund ?? 0;
-  const nearMissCount = (currentState.result?.gameData as any)?.nearMissCount ?? 0; // Количество near-miss строк
-  const nearMissSymbolUrl = (currentState.result?.gameData as any)?.nearMissSymbolUrl as string | null | undefined;
-  const nearMissSymbolName = (currentState.result?.gameData as any)?.nearMissSymbolName as string | null | undefined;
-  const shouldTriggerReSpin = Boolean((currentState.result?.gameData as any)?.shouldTriggerReSpin);
-  const reSpinColumns = (currentState.result?.gameData as any)?.reSpinColumns as number[] | undefined;
-  const twoMatch = Boolean((currentState.result?.gameData as any)?.twoMatch);
-  const twoMatchSymbolUrl = (currentState.result?.gameData as any)?.twoMatchSymbolUrl as string | null | undefined;
-  const twoMatchSymbolName = (currentState.result?.gameData as any)?.twoMatchSymbolName as string | null | undefined;
-  const lastMultiplier = typeof (currentState.result?.gameData as any)?.multiplier === "number" 
-    ? (currentState.result?.gameData as any).multiplier 
-    : null;
-  const winningLines = (currentState.result?.gameData as any)?.winningLines as number[][] | undefined;
-  const matchedSymbol = (currentState.result?.gameData as any)?.matchedSymbol as NftSymbolSummary | undefined;
-  const matchedSymbols = (currentState.result?.gameData as any)?.matchedSymbols as NftSymbolSummary[] | undefined;
+  // Cast gameData to proper type
+  const nftData = currentState.result?.gameData as NftGameResultData | undefined;
+  const matched = Boolean(nftData?.matched);
+  const nearMiss = Boolean(nftData?.nearMiss);
+  const nearMissRefund = nftData?.nearMissRefund ?? 0;
+  const nearMissCount = nftData?.nearMissCount ?? 0;
+  const nearMissSymbolUrl = nftData?.nearMissSymbolUrl;
+  const nearMissSymbolName = nftData?.nearMissSymbolName;
+  const shouldTriggerReSpin = Boolean(nftData?.shouldTriggerReSpin);
+  const reSpinColumns = nftData?.reSpinColumns;
+  const twoMatch = Boolean(nftData?.twoMatch);
+  const twoMatchSymbolUrl = nftData?.twoMatchSymbolUrl;
+  const twoMatchSymbolName = nftData?.twoMatchSymbolName;
+  const lastMultiplier = typeof nftData?.multiplier === "number" ? nftData.multiplier : null;
+  const winningLines = nftData?.winningLines;
+  const matchedSymbol = nftData?.matchedSymbol;
+  const matchedSymbols = nftData?.matchedSymbols;
+
+  useEffect(() => {
+    const stickyPositions = nftData?.stickyWildPositions;
+    if (Array.isArray(stickyPositions)) {
+      setStickyWildPositionsState(stickyPositions);
+      return;
+    }
+    const newSticky = nftData?.newStickyWildPositions;
+    if (Array.isArray(newSticky) && newSticky.length > 0) {
+      setStickyWildPositionsState(prev => {
+        const merged = new Set(prev);
+        newSticky.forEach(idx => merged.add(idx));
+        return Array.from(merged).sort((a, b) => a - b);
+      });
+    }
+  }, [nftData?.stickyWildPositions, nftData?.newStickyWildPositions]);
 
   // Обработка фри-спинов
   useEffect(() => {
-    if (nftData?.freeSpinsTriggered && !freeSpins.active) {
-      setFreeSpins({ active: true, remaining: 10, total: 10 });
-      setFreeSpinPositions(nftData.freeSpinPositions ?? []);
-      setAutoPlayFree(true);
-    } else if (freeSpins.active && nftData?.freeSpinsTriggered) {
-      // Дополнительные фри-спины во время фри-спинов
+    if (!nftData?.freeSpinsTriggered) return;
+    const award = Math.max(1, nftData.freeSpinsAwarded ?? 10);
+    setFreeSpinPositions(nftData.freeSpinPositions ?? []);
+    setAutoPlayFree(true);
+    if (!freeSpins.active) {
+      setFreeSpins({ active: true, remaining: award, total: award });
+    } else {
       setFreeSpins(prev => ({
         ...prev,
-        remaining: prev.remaining + 3,
-        total: prev.total + 3
+        remaining: prev.remaining + award,
+        total: prev.total + award
       }));
-      setFreeSpinPositions(nftData.freeSpinPositions ?? []);
     }
-  }, [nftData?.freeSpinsTriggered]);
+  }, [freeSpins.active, nftData?.freeSpinsTriggered, nftData?.freeSpinsAwarded, nftData?.freeSpinPositions]);
 
   // Уменьшаем счётчик фри-спинов после каждого спина
   useEffect(() => {
@@ -191,32 +340,45 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
     }
   }, [result, isPlaying]);
 
+  useEffect(() => {
+    if (!game) return;
+    const wasActive = prevFreeSpinActiveRef.current;
+    if (wasActive && !freeSpins.active) {
+      clearSlotSession(game.id);
+      setStickyWildPositionsState([]);
+    }
+    prevFreeSpinActiveRef.current = freeSpins.active;
+  }, [freeSpins.active, game]);
+
   // Автоматический фри-спин - ждём пока барабаны остановятся
   useEffect(() => {
     if (autoPlayFree && freeSpins.active && freeSpins.remaining > 0 && !isPlaying && currentState.settled) {
       const timer = setTimeout(() => {
+        // СНАЧАЛА запускаем анимацию
+        setSpinId(prev => prev + 1);
         setCurrentState(prev => ({ ...prev, settled: false, isSpinning: true }));
-        void onPlay(0, { mode, freeSpinMode: true });
+        // ПОТОМ вызываем API
+        void onPlay(0, { mode, freeSpinMode: true, stickyWildPositions: stickyWildPositionsState });
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [autoPlayFree, freeSpins, isPlaying, mode, onPlay, currentState.settled]);
+  }, [autoPlayFree, freeSpins, isPlaying, mode, onPlay, currentState.settled, stickyWildPositionsState]);
 
   // Автоматический ре-спин колонок с FREE wildcard
   useEffect(() => {
     if (shouldTriggerReSpin && reSpinColumns && reSpinColumns.length > 0 && currentState.settled && !isPlaying) {
       // Ждем 1.5 секунды чтобы пользователь увидел FREE символы
       const timer = setTimeout(() => {
-        // Запускаем ре-спин (тот же API вызов, но FREE будет работать как wildcard)
-        setCurrentState(prev => ({ ...prev, settled: false }));
         const betAmount = freeSpins.active ? 0 : spinPrice;
-        void onPlay(betAmount, { mode, freeSpinMode: freeSpins.active }).then(() => {
-          setCurrentState(prev => ({ ...prev, isSpinning: true, settled: false }));
-        });
+        // СНАЧАЛА запускаем анимацию
+        setSpinId(prev => prev + 1);
+        setCurrentState(prev => ({ ...prev, isSpinning: true, settled: false }));
+        // ПОТОМ вызываем API
+        void onPlay(betAmount, { mode, freeSpinMode: freeSpins.active, stickyWildPositions: stickyWildPositionsState });
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [shouldTriggerReSpin, reSpinColumns, currentState.settled, isPlaying, freeSpins.active, spinPrice, mode, onPlay]);
+  }, [shouldTriggerReSpin, reSpinColumns, currentState.settled, isPlaying, freeSpins.active, spinPrice, mode, onPlay, stickyWildPositionsState]);
 
   if (!game) {
     return null;
@@ -230,23 +392,36 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
     
     const betAmount = freeSpins.active ? 0 : spinPrice;
     
-    // Сначала получаем результат от API
-    void onPlay(betAmount, { mode, freeSpinMode: freeSpins.active }).then(() => {
-      // ПОСЛЕ получения ответа запускаем анимацию
-      setCurrentState(prev => ({ ...prev, isSpinning: true, settled: false }));
-    });
+    // СНАЧАЛА запускаем анимацию, ПОТОМ вызываем API
+    setSpinId(prev => prev + 1);
+    setCurrentState(prev => ({ ...prev, isSpinning: true, settled: false }));
+    
+    // Вызываем API (результат придёт позже и обновит symbols)
+    void onPlay(betAmount, { mode, freeSpinMode: freeSpins.active, stickyWildPositions: stickyWildPositionsState });
   };
 
   const handleAllSettled = useCallback((settledMode: SlotMode) => {
-    if (settledMode === "classic") {
-      setClassicState(prev => ({ ...prev, settled: true, isSpinning: false }));
-    } else {
-      setExpandedState(prev => ({ ...prev, settled: true, isSpinning: false }));
+    if (settledMode === "expanded") {
+      setExpandedState(prev => ({
+        ...prev,
+        displaySymbols: prev.nextSymbols ?? prev.displaySymbols,
+        nextSymbols: null,
+        settled: true,
+        isSpinning: false
+      }));
+    } else if (settledMode === "mode5") {
+      setMode5State(prev => ({
+        ...prev,
+        displaySymbols: prev.nextSymbols ?? prev.displaySymbols,
+        nextSymbols: null,
+        settled: true,
+        isSpinning: false
+      }));
     }
   }, []);
 
   const toggleMode = () => {
-    setMode(prev => prev === "classic" ? "expanded" : "classic");
+    setMode(prev => prev === "expanded" ? "mode5" : "expanded");
   };
 
   return (
@@ -271,49 +446,56 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
         {/* Mode Toggle - можно переключаться даже во время спина */}
         <div className="mode-toggle">
           <button 
-            className={`mode-btn ${mode === "classic" ? "active" : ""} ${classicState.isSpinning ? "spinning" : ""}`}
-            onClick={() => setMode("classic")}
-            disabled={freeSpins.active}
-          >
-            Classic 3
-          </button>
-          <button 
             className={`mode-btn ${mode === "expanded" ? "active" : ""} ${expandedState.isSpinning ? "spinning" : ""}`}
             onClick={() => setMode("expanded")}
             disabled={freeSpins.active}
           >
             Mega 3×3
           </button>
+          <button 
+            className={`mode-btn ${mode === "mode5" ? "active" : ""} ${mode5State.isSpinning ? "spinning" : ""}`}
+            onClick={() => setMode("mode5")}
+            disabled={freeSpins.active}
+          >
+            Ultra 5×5
+          </button>
         </div>
 
-        {/* Classic Mode - скрыт когда не активен */}
-        <div style={{ display: mode === "classic" ? "block" : "none" }}>
-          <NftReelStage
-            pool={selectedPool}
-            activeSymbols={classicState.symbols}
-            isSpinning={classicState.isSpinning}
-            highlightWin={Boolean((classicState.result?.gameData as any)?.matched)}
-            winningLines={mode === "classic" ? winningLines : undefined}
-            mode="classic"
-            freeSpinState={freeSpins}
-            freeSpinPositions={freeSpinPositions}
-            onAllSettled={() => handleAllSettled("classic")}
-          />
-        </div>
-        
         {/* Expanded Mode - скрыт когда не активен */}
         <div style={{ display: mode === "expanded" ? "block" : "none" }}>
           <NftReelStage
             pool={selectedPool}
-            activeSymbols={expandedState.symbols}
+            displaySymbols={expandedState.displaySymbols}
+            nextSymbols={expandedState.nextSymbols}
             isSpinning={expandedState.isSpinning}
+            spinId={spinId}
             highlightWin={Boolean((expandedState.result?.gameData as any)?.matched)}
             winningLines={mode === "expanded" ? winningLines : undefined}
             mode="expanded"
             freeSpinState={freeSpins}
             freeSpinPositions={freeSpinPositions}
+            stickyWildPositions={stickyWildPositionsState}
             reSpinColumns={mode === "expanded" ? reSpinColumns : undefined}
             onAllSettled={() => handleAllSettled("expanded")}
+          />
+        </div>
+        
+        {/* Mode5 (5x5) - скрыт когда не активен */}
+        <div style={{ display: mode === "mode5" ? "block" : "none" }}>
+          <NftReelStage
+            pool={selectedPool}
+            displaySymbols={mode5State.displaySymbols}
+            nextSymbols={mode5State.nextSymbols}
+            isSpinning={mode5State.isSpinning}
+            spinId={spinId}
+            highlightWin={Boolean((mode5State.result?.gameData as any)?.matched)}
+            winningLines={mode === "mode5" ? winningLines : undefined}
+            mode="mode5"
+            freeSpinState={freeSpins}
+            freeSpinPositions={freeSpinPositions}
+            stickyWildPositions={stickyWildPositionsState}
+            reSpinColumns={mode === "mode5" ? reSpinColumns : undefined}
+            onAllSettled={() => handleAllSettled("mode5")}
           />
         </div>
 
@@ -385,7 +567,7 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
                 ) : (
                   // Несколько побед
                   <div className="multi-win-display">
-                    <p className="win-message">🎉🎉 MULTI WIN! {matchedSymbols.length} lines! 🎉🎉</p>
+                    <p className="win-message">🎉🎉 MULTI WIN! {winningLines?.length ?? matchedSymbols.length} lines! 🎉🎉</p>
                     <div className="multi-win-grid">
                       {matchedSymbols.map((sym, idx) => (
                         <div key={idx} className="mini-win-card">
@@ -433,6 +615,49 @@ const GameModal: React.FC<Props> = ({ game, result, isPlaying, onClose, onPlay, 
             <div className="result-chips">
               <span>Payout: <TonIcon />{formatNumber(result.payout)}</span>
               {lastMultiplier ? <span>x{lastMultiplier.toFixed(2)}</span> : null}
+              {nftData?.appliedMultiplier && (
+                <span className="multiplier-symbol" style={{ 
+                  background: nftData.appliedMultiplier.rarity === 'epic' 
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                    : nftData.appliedMultiplier.rarity === 'rare'
+                    ? 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+                    : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                  padding: '4px 12px',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  fontSize: '1.1em',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                }}>
+                  🎰 x{nftData.appliedMultiplier.value}
+                </span>
+              )}
+            </div>
+          )}
+          
+          {/* Win Breakdown */}
+          {nftData?.winBreakdown && (
+            <div className="win-breakdown" style={{
+              marginTop: '12px',
+              padding: '12px',
+              background: 'rgba(255,255,255,0.05)',
+              borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.1)'
+            }}>
+              <div style={{ fontSize: '0.9em', color: '#aaa', marginBottom: '8px' }}>💰 Win Details:</div>
+              {Object.entries(nftData.winBreakdown).map(([type, amount]) => (
+                <div key={type} style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  padding: '4px 0',
+                  fontSize: '0.85em',
+                  color: '#fff'
+                }}>
+                  <span>{type}:</span>
+                  <span style={{ fontWeight: 'bold' }}>
+                    <TonIcon />{formatNumber(amount)}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </section>

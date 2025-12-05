@@ -101,10 +101,26 @@ function parsePrice(raw: string): number {
   if (!raw) {
     return 0;
   }
-  const sanitized = raw
-    .replace(/[\u2000-\u206F\s]/g, "")
-    .replace(/[^0-9.,]/g, "")
-    .replace(/,/g, ".");
+  
+  // FIXED: Handle space as decimal separator (5 500 = 5.5, 5500 = 5500)
+  // If there's a space, treat it as decimal separator
+  const trimmed = raw.trim();
+  
+  // Check if there's a space in the middle (not at start/end)
+  const spaceMatch = trimmed.match(/^(\d+)\s+(\d+)$/);
+  if (spaceMatch) {
+    // Format: "5 500" means 5.5
+    const intPart = spaceMatch[1];
+    const decPart = spaceMatch[2];
+    return parseFloat(`${intPart}.${decPart}`);
+  }
+  
+  // Standard parsing for formats like "5.5", "5,5", "5500"
+  const sanitized = trimmed
+    .replace(/[\u2000-\u206F]/g, "") // Remove unicode spaces except regular space
+    .replace(/[^0-9.,\s]/g, "")      // Keep digits, dot, comma, space
+    .replace(/,/g, ".");              // Normalize comma to dot
+  
   const value = Number.parseFloat(sanitized);
   return Number.isFinite(value) ? value : 0;
 }

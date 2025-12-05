@@ -10,6 +10,7 @@ import { ISlotProvider, ISlotGame } from "../../domain/interfaces/ISlotProvider"
 import { AppDataSource } from "../../infrastructure/database/data-source";
 import { TypeOrmUserRepository } from "../../infrastructure/repositories/TypeOrmUserRepository";
 import { TypeOrmGameResultRepository } from "../../infrastructure/repositories/TypeOrmGameResultRepository";
+import { ShardBalanceRepository } from "../../infrastructure/repositories/ShardBalanceRepository";
 
 const PASSWORD_SALT_ROUNDS = process.env.PASSWORD_SALT_ROUNDS 
   ? parseInt(process.env.PASSWORD_SALT_ROUNDS, 10) 
@@ -18,12 +19,16 @@ const PASSWORD_SALT_ROUNDS = process.env.PASSWORD_SALT_ROUNDS
 const RESET_TOKEN_EXPIRY_HOURS = 1;
 
 export class CasinoService {
+  private shardRepository: ShardBalanceRepository;
+
   constructor(
     private userRepository: IUserRepository,
     private gameResultRepository: IGameResultRepository,
     private games: IGame[],
     private slotProviders: ISlotProvider[] = []
-  ) {}
+  ) {
+    this.shardRepository = new ShardBalanceRepository();
+  }
 
   async registerUser(name: string, password: string, initialBalance: number = 1000): Promise<User> {
     const normalizedName = this.normalizeName(name);
@@ -290,6 +295,9 @@ export class CasinoService {
       user.deposit(result.payout);
     }
 
+    // Award shards if any
+    await this.awardShardsFromResult(userId, result);
+
     await this.persistGameSession(user, result);
 
     return result;
@@ -318,6 +326,9 @@ export class CasinoService {
     if (result.payout > 0) {
       user.deposit(result.payout);
     }
+
+    // Award shards if any
+    await this.awardShardsFromResult(userId, result);
 
     await this.persistGameSession(user, result);
 
@@ -370,6 +381,24 @@ export class CasinoService {
 
   private generateId(): string {
     return randomUUID();
+  }
+
+  /**
+   * Award shards to player based on game result metadata
+   */
+  private async awardShardsFromResult(userId: string, result: GameResult): Promise<void> {
+    const shardsAwarded = result.gameData?.shardsAwarded;
+    if (!shardsAwarded || !Array.isArray(shardsAwarded) || shardsAwarded.length === 0) {
+      return;
+    }
+
+    try {
+      await this.shardRepository.addShards(userId, shardsAwarded);
+      console.log(`✨ Awarded ${shardsAwarded.length} shards to player ${userId}`);
+    } catch (error) {
+      console.error("Error awarding shards:", error);
+      // Don't throw - shard award failure shouldn't break the game flow
+    }
   }
 
   private async persistGameSession(user: User, result: GameResult): Promise<void> {

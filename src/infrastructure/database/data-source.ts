@@ -4,6 +4,7 @@ import { DataSource, DataSourceOptions } from "typeorm";
 import { UserOrmEntity } from "./entities/UserOrmEntity";
 import { GameResultOrmEntity } from "./entities/GameResultOrmEntity";
 import { PaymentTransactionOrmEntity } from "./entities/PaymentTransactionOrmEntity";
+import { PlayerShardBalance } from "./entities/PlayerShardBalance";
 
 dotenv.config();
 
@@ -27,7 +28,9 @@ const createDataSourceOptions = (): DataSourceOptions => {
     url: process.env.DATABASE_URL,
     synchronize,
     logging,
-    entities: [UserOrmEntity, GameResultOrmEntity, PaymentTransactionOrmEntity],
+    entities: [UserOrmEntity, GameResultOrmEntity, PaymentTransactionOrmEntity, PlayerShardBalance],
+    migrations: ["src/infrastructure/database/migrations/*.ts"],
+    migrationsTableName: "migrations",
     ssl: sslEnabled ? { rejectUnauthorized } : false
   };
 };
