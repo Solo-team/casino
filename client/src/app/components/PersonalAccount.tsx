@@ -3,6 +3,7 @@ import type { ApiGameResult, ApiUser } from "../../types/api";
 import { formatCurrency, formatDate } from "../utils/format";
 import AuthModal from "./AuthModal";
 import HistoryPanel from "./HistoryPanel";
+import InventoryPanel from "./InventoryPanel";
 interface Props {
   user: ApiUser | null;
   history: ApiGameResult[];
@@ -91,6 +92,7 @@ const PersonalAccount: React.FC<Props> = ({
   }
 
   const totalGames = history.length;
+  const lastActivity = lastResult?.timestamp ?? user.createdAt;
   const lastResultText = lastResult
     ? lastResult.resultType === "WIN"
       ? `Won ${formatCurrency(lastResult.payout)}`
@@ -152,7 +154,25 @@ const PersonalAccount: React.FC<Props> = ({
           </div>
         </header>
 
-        <div className="account-layout single-column">
+        <div className="account-quick-strip">
+          <div className="account-quick-card">
+            <span className="eyebrow">Rounds</span>
+            <strong>{totalGames || 0}</strong>
+            <small className="muted">All games played</small>
+          </div>
+          <div className="account-quick-card" data-trend={lastResultTrend}>
+            <span className="eyebrow">Last result</span>
+            <strong>{lastResult ? lastResultText : "No rounds yet"}</strong>
+            <small className="muted">{lastResult ? formatDate(lastActivity) : "Start a session"}</small>
+          </div>
+          <div className="account-quick-card">
+            <span className="eyebrow">Last activity</span>
+            <strong>{formatDate(lastActivity)}</strong>
+            <small className="muted">Synced across devices</small>
+          </div>
+        </div>
+
+        <div className="account-layout">
           <div className="account-main">
             <HistoryPanel
               className="account-card history-panel-card"
@@ -160,6 +180,12 @@ const PersonalAccount: React.FC<Props> = ({
               active={true}
               onRefresh={onRefreshHistory}
               isRefreshing={isHistoryRefreshing}
+            />
+          </div>
+          <div className="account-aside">
+            <InventoryPanel
+              className="account-card"
+              history={history}
             />
           </div>
         </div>
